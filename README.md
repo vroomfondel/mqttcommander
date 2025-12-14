@@ -1,6 +1,6 @@
 ![mypy and pytests](https://github.com/vroomfondel/mqttcommander/actions/workflows/mypynpytests.yml/badge.svg)
 [![BuildAndPushMultiarch](https://github.com/vroomfondel/mqttcommander/actions/workflows/buildmultiarchandpush.yml/badge.svg)](https://github.com/vroomfondel/mqttcommander/actions/workflows/buildmultiarchandpush.yml)
-![Cumulative Clones](https://img.shields.io/endpoint?logo=github&url=https://gist.githubusercontent.com/vroomfondel/8a315c36125952c9976548dfbf45cb7b/raw/mqttcommander_clone_count.json)
+![Cumulative Clones](https://img.shields.io/endpoint?logo=github&url=https://gist.githubusercontent.com/vroomfondel/65da30603d04548c80d1e67042b60a6f/raw/mqttcommander_clone_count.json)
 [![Docker Pulls](https://img.shields.io/docker/pulls/xomoxcc/mqttcommander?logo=docker)](https://hub.docker.com/r/xomoxcc/mqttcommander/tags)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/mqttcommander?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=PyPi+Downloads)](https://pepy.tech/projects/mqttcommander)
 
