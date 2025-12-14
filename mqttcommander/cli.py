@@ -67,7 +67,9 @@ def _run(
                 raise SystemExit("--command is required for action send-cmd")
             all_devs = comm.get_all_tasmota_devices_from_retained(noisy=False)
             online = comm.filter_online_tasmotas_from_retained(all_devs)
-            vals_typed = cast(List[List[Union[str, float, dict, int]] | None] | None, [values] if values is not None else None)
+            vals_typed = cast(
+                List[List[Union[str, float, dict, int]] | None] | None, [values] if values is not None else None
+            )
             comm.send_cmds_to_online_tasmotas(online, to_be_used_commands=[command], values_to_send=vals_typed)
         case _:
             raise SystemExit(f"Unknown action: {action}")

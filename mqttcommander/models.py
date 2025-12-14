@@ -64,7 +64,7 @@ class TasmotaTimeZoneDSTSTD(BaseModel):
     offset: Optional[int] = Field(None, validation_alias=AliasChoices("Offset", "offset"))
 
     def to_tasmota_command_string(self) -> str:
-        return str([self.hemisphere,self.week,self.month,self.day,self.hour,self.offset]).replace(" ", "")
+        return str([self.hemisphere, self.week, self.month, self.day, self.hour, self.offset]).replace(" ", "")
 
     @classmethod
     def from_tasmota_command_string(cls, values_comma_separated: str) -> TasmotaTimeZoneDSTSTD:
@@ -78,8 +78,9 @@ class TasmotaTimeZoneDSTSTD(BaseModel):
             month=int(data[2]),
             day=int(data[3]),
             hour=int(data[4]),
-            offset=int(data[5])
+            offset=int(data[5]),
         )
+
 
 class TasmotaTimezoneConfig(BaseModel):
     latitude: Optional[float] = Field(None, validation_alias=AliasChoices("Latitude", "latitude"))
@@ -89,19 +90,21 @@ class TasmotaTimezoneConfig(BaseModel):
     timezone: Optional[int | str] = Field(None, validation_alias=AliasChoices("Timezone", "timezone"))  # 99 | +01:00
 
     def as_tasmota_command_list(self) -> List[str | float | dict[Any, Any] | int] | None:
-        assert self.latitude is not None and \
-            self.longitude is not None and \
-            self.timedst is not None and \
-            self.timestd is not None and \
-            self.timezone is not None
+        assert (
+            self.latitude is not None
+            and self.longitude is not None
+            and self.timedst is not None
+            and self.timestd is not None
+            and self.timezone is not None
+        )
 
         return [
-                self.latitude,
-                self.longitude,
-                self.timedst.to_tasmota_command_string(),  # that is correct!
-                self.timestd.to_tasmota_command_string(),  # that is correct!
-                self.timezone
-            ]
+            self.latitude,
+            self.longitude,
+            self.timedst.to_tasmota_command_string(),  # that is correct!
+            self.timestd.to_tasmota_command_string(),  # that is correct!
+            self.timezone,
+        ]
 
     def to_tasmota_command_string(self) -> str:
         return str(self.as_tasmota_command_list()).replace(" ", "")

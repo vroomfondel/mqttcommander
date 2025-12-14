@@ -16,11 +16,17 @@ import pytz
 
 import Helper
 from mqttcommander.Helper import get_pretty_dict_json_no_sort
-from mqttcommander.models import TasmotaTimezoneConfig, TasmotaDeviceConfig, TasmotaRule, TasmotaDeviceSensors, TasmotaDevice, TasmotaTimeZoneDSTSTD
+from mqttcommander.models import (
+    TasmotaTimezoneConfig,
+    TasmotaDeviceConfig,
+    TasmotaRule,
+    TasmotaDeviceSensors,
+    TasmotaDevice,
+    TasmotaTimeZoneDSTSTD,
+)
 
 logger.debug(f"{__name__} DEBUG")
 logger.info(f"{__name__} INFO")
-
 
 
 # print(maca.model_dump())
@@ -44,13 +50,13 @@ class MqttCommander:
 
     def __init__(
         self,
-        topics: list[str]|None = None,
+        topics: list[str] | None = None,
         msg_topicname_startwith_drop_filter: Set | None = _msg_topicname_startwith_drop_filter_defaultset,  # type: ignore
         mqttclient: MosquittoClientWrapper | None = None,
         host: str | None = None,
         port: int | None = None,
         username: str | None = None,
-        password: str | None = None
+        password: str | None = None,
     ):
         self.msg_topicname_startwith_drop_filter = msg_topicname_startwith_drop_filter
 
@@ -81,8 +87,6 @@ class MqttCommander:
         self.mqttclient.set_topics(self.topics)
         self.cmdsent: bool = False
 
-
-
     def apply_topic_filter(self, msgs: list[MWMqttMessage] | None) -> list[MWMqttMessage] | None:
         if self.msg_topicname_startwith_drop_filter is None or msgs is None:
             return msgs
@@ -98,7 +102,6 @@ class MqttCommander:
 
         return ret
 
-
     def get_all_retained(
         self,
         topics: list[str] | None = None,
@@ -111,11 +114,13 @@ class MqttCommander:
         if topics is None:
             topics = self.topics
 
-        assert self.mqttclient is not None and \
-               self.mqttclient.host is not None and \
-               self.mqttclient.port is not None and \
-               self.mqttclient.username is not None and \
-               self.mqttclient.password is not None
+        assert (
+            self.mqttclient is not None
+            and self.mqttclient.host is not None
+            and self.mqttclient.port is not None
+            and self.mqttclient.username is not None
+            and self.mqttclient.password is not None
+        )
 
         # need fresh connect to server - otherwise, the retained data is not sent to a ("cleansession=true) client
         # TODO: HT20251214 check if handing down provided mqttclient could be an option...
@@ -153,10 +158,10 @@ class MqttCommander:
         self.__class__.logger.debug(get_pretty_dict_json_no_sort(msg.model_dump(by_alias=True)))
 
     def send_cmds_to_online_tasmotas(
-            self,
-            tasmotas: List[TasmotaDevice],
-            to_be_used_commands: List[str] | None = None,
-            values_to_send: List[List[str | float | dict | int] | None] | None = None,
+        self,
+        tasmotas: List[TasmotaDevice],
+        to_be_used_commands: List[str] | None = None,
+        values_to_send: List[List[str | float | dict | int] | None] | None = None,
     ) -> List[TasmotaDevice]:
         to_be_used_commands = to_be_used_commands or [
             "RULE1",
@@ -224,11 +229,13 @@ class MqttCommander:
         # logger.debug("Sleeping 10s")
         # time.sleep(10)
 
-        assert self.mqttclient is not None and \
-               self.mqttclient.host is not None and \
-               self.mqttclient.port is not None and \
-               self.mqttclient.username is not None and \
-               self.mqttclient.password is not None
+        assert (
+            self.mqttclient is not None
+            and self.mqttclient.host is not None
+            and self.mqttclient.port is not None
+            and self.mqttclient.username is not None
+            and self.mqttclient.password is not None
+        )
 
         # TODO: HT20251214 new connection really necessary here ?!
         mq: MosquittoClientWrapper = MosquittoClientWrapper(
@@ -382,13 +389,15 @@ class MqttCommander:
 
         return tasmotas
 
-    def ensure_correct_timezone_settings_for_tasmotas(self, online_tasmotas: List[TasmotaDevice], timezoneconfig: Optional[TasmotaTimezoneConfig] = None) -> List[TasmotaDevice]:
+    def ensure_correct_timezone_settings_for_tasmotas(
+        self, online_tasmotas: List[TasmotaDevice], timezoneconfig: Optional[TasmotaTimezoneConfig] = None
+    ) -> List[TasmotaDevice]:
         timezoneconfig = timezoneconfig or TasmotaTimezoneConfig(
             latitude=53.6437753,
             longitude=9.8940783,
             timedst=TasmotaTimeZoneDSTSTD.from_tasmota_command_string("0,0,3,1,1,120"),
             timestd=TasmotaTimeZoneDSTSTD.from_tasmota_command_string("0,0,10,1,1,60"),
-            timezone=99
+            timezone=99,
         )
 
         assert timezoneconfig is not None
@@ -419,11 +428,8 @@ class MqttCommander:
                 #             )
 
         return self.send_cmds_to_online_tasmotas(
-            tasmotas=online_tasmotas,
-            to_be_used_commands=to_be_sent_commands,
-            values_to_send=values_to_send
+            tasmotas=online_tasmotas, to_be_used_commands=to_be_sent_commands, values_to_send=values_to_send
         )
-
 
     def update_online_tasmotas(self, tasmotas: List[TasmotaDevice]) -> List[TasmotaDevice]:
         tasmota_online: List[TasmotaDevice] = []
@@ -467,8 +473,7 @@ class MqttCommander:
         ]
 
         online_tasmotas: List[TasmotaDevice] = self.filter_online_tasmotas_from_retained(
-            all_tasmotas=tds,
-            update_lwt_current_value=True
+            all_tasmotas=tds, update_lwt_current_value=True
         )
 
         updated_tasmotas: List[TasmotaDevice] = self.update_online_tasmotas(
@@ -490,20 +495,18 @@ class MqttCommander:
             assert td.tasmota_config is not None
             if changecount > 0:
                 logger.debug(
-                    f"{td.tasmota_config.topic} -> [{changecount=}]\n{textwrap.indent(diff_str.getvalue(), "\t")}")
+                    f"{td.tasmota_config.topic} -> [{changecount=}]\n{textwrap.indent(diff_str.getvalue(), "\t")}"
+                )
             else:
                 logger.debug(f"{td.tasmota_config.topic} -> NOTHING CHANGED.")
 
         write_tasmota_devices_file(tasmotas=tds)
 
-
-
-    def get_all_tasmota_devices_from_retained(self,
-            topics: List[str] | None = None, noisy: bool = False, noisy_lowerlevel: bool = False
+    def get_all_tasmota_devices_from_retained(
+        self, topics: List[str] | None = None, noisy: bool = False, noisy_lowerlevel: bool = False
     ) -> list[TasmotaDevice]:
         topics = topics or TASMOTA_DEFAULT_TOPICS
         ret: list[TasmotaDevice] = []
-
 
         msgs: list[MWMqttMessage] | None = self.get_all_retained(
             topics=topics,
@@ -523,8 +526,8 @@ class MqttCommander:
                     logger.debug(f"DIS [{num:03}] {msg.topic}\t[{type(msg.value)=}] {msg.value}")
 
                 if msg.topic.startswith(TASMOTA_DISCOVERY_TOPIC_BEGIN):
-                    maclookupkey: str = msg.topic[0: msg.topic.rfind("/")]
-                    maclookupkey = maclookupkey[maclookupkey.rfind("/") + 1:]
+                    maclookupkey: str = msg.topic[0 : msg.topic.rfind("/")]
+                    maclookupkey = maclookupkey[maclookupkey.rfind("/") + 1 :]
 
                     td = tdlookup.get(maclookupkey)
                     if noisy:
@@ -540,8 +543,9 @@ class MqttCommander:
                         if noisy:
                             logger.debug(
                                 get_pretty_dict_json_no_sort(
-                                    td.model_dump(mode="python", exclude_none=False, exclude_defaults=False,
-                                                  by_alias=False)
+                                    td.model_dump(
+                                        mode="python", exclude_none=False, exclude_defaults=False, by_alias=False
+                                    )
                                 )
                             )
 
@@ -553,8 +557,9 @@ class MqttCommander:
                         if noisy:
                             logger.debug(
                                 get_pretty_dict_json_no_sort(
-                                    td.model_dump(mode="python", exclude_none=False, exclude_defaults=False,
-                                                  by_alias=False)
+                                    td.model_dump(
+                                        mode="python", exclude_none=False, exclude_defaults=False, by_alias=False
+                                    )
                                 )
                             )
 
@@ -582,8 +587,8 @@ class MqttCommander:
 
         return ret
 
-    def filter_online_tasmotas_from_retained(self,
-            all_tasmotas: List[TasmotaDevice], update_lwt_current_value: bool = True
+    def filter_online_tasmotas_from_retained(
+        self, all_tasmotas: List[TasmotaDevice], update_lwt_current_value: bool = True
     ) -> List[TasmotaDevice]:
         all_online_tasmotas: List[TasmotaDevice] = self.get_all_tasmota_devices_from_retained()
 
@@ -612,7 +617,12 @@ class MqttCommander:
         return ret
 
 
-def write_tasmota_devices_file(tasmotas: List[TasmotaDevice], fp: Path | None = None, noisy: bool = False, timezone: tzinfo=pytz.timezone("Europe/Berlin")) -> Path:
+def write_tasmota_devices_file(
+    tasmotas: List[TasmotaDevice],
+    fp: Path | None = None,
+    noisy: bool = False,
+    timezone: tzinfo = pytz.timezone("Europe/Berlin"),
+) -> Path:
     if fp is None:
         fp = Path(__file__)
         fp = Path(fp.parent.resolve(), "tasmotas")
@@ -647,7 +657,7 @@ def write_tasmota_devices_file(tasmotas: List[TasmotaDevice], fp: Path | None = 
 
 
 def read_tasmotas_from_latest_file(
-    tasmota_json_dir: Path | None = None, noisy: bool = False, timezone: tzinfo=pytz.timezone("Europe/Berlin")
+    tasmota_json_dir: Path | None = None, noisy: bool = False, timezone: tzinfo = pytz.timezone("Europe/Berlin")
 ) -> Optional[List[TasmotaDevice]]:
     if tasmota_json_dir is None:
         tasmota_json_dir = Path(__file__)
