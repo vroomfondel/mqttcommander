@@ -1,0 +1,11 @@
+REDIS:
+  host: "127.0.0.1"
+  host_in_cluster: "redis.redis.svc.cluster.local"
+  PORT: 6379
+
+MQTT:
+  username: "mqttusernamechangeme"
+  password: "mqttpasswordchangeme"
+  host: "mosquitto.mosquitto.svc.cluster.local"
+  port: 1883
+

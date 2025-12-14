@@ -1,0 +1,92 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+# ignore-vcs = true
+# only-packages = true
+packages = ["mqttcommander"]
+#artifacts = [
+#  "pytest.ini",
+#  ".mypy.ini"
+#]
+#include = [
+#    "pytest.ini",
+#    ".mypy.ini",
+#]
+#exclude = [
+#  ".gitignore"
+#]
+
+[project]
+name = "mqttcommander"
+dynamic = ["version"]
+authors = [
+  { name="Henning Thieß", email="ht@xomox.cc" },
+]
+description = "MQTTCommander"
+readme = "README.md"
+requires-python = ">=3.14"
+license-files = ["LICENSE.md"]
+
+keywords = ["mqtt", "tasmota", "home automation", "iot", "mqtt client", "command sender"]
+# https://pypi.org/classifiers/
+# https://github.com/pypa/trove-classifiers/blob/main/src/trove_classifiers/__init__.py
+classifiers = [
+    #   3 - Alpha
+    #   4 - Beta
+    #   5 - Production/Stable
+    "Development Status :: 4 - Beta",
+
+    "Programming Language :: Python :: 3",
+#    "Programming Language :: Python :: 3.12",
+#    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+
+    #"Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet",
+    "Topic :: Home Automation",
+
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+]
+
+
+dependencies = [
+    'mqttstuff>=0.0.4',
+    'pydantic>=2.11.0',
+    'loguru>=0.7.3',
+    'pydantic-settings>=2.11.0',
+    'pydantic_extra_types>=2.10.2',
+    'PyYAML>=6.0.0',
+    'pytz>=2025.2'
+
+#     dependecies from mqttstuff:
+#     'loguru>=0.7.3',
+#     'pytz>=2025.2',
+#     'paho-mqtt>=2.1.0',
+#     'pydantic>=2.11.0',
+]
+
+[project.scripts]
+mqttcommander = "mqttcommander.cli:main"
+
+#[project.optional-dependencies]
+#tests = [
+#    'pytest==7.1.3'
+#]
+
+
+[project.urls]
+Homepage = "https://github.com/vroomfondel/mqttcommander"
+Repository = "https://github.com/vroomfondel/mqttcommander"
+Issues = "https://github.com/vroomfondel/mqttcommander/issues"
+# Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+# "Bug Tracker" = "https://github.com/pypa/sampleproject/issues"
+
+
+[tool.hatch.version]
+path = "mqttcommander/__init__.py"
+# pattern = "BUILD = 'b(?P<version>[^']+)'"

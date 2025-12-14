@@ -1,0 +1,19 @@
+-r requirements.txt
+
+pyrefly
+pygithub
+
+pre-commit==4.5.*
+
+# linting
+isort==7.0.*
+black==25.12.*
+mypy==1.19.*
+
+pytest==9.0.*
+
+types-pytz>=2025.2
+
+# httpx
+# types-cachetools
+# types-requests>=2.32.4.20250913
