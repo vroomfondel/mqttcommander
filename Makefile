@@ -95,7 +95,7 @@ build: venv
 
 dstart:
 	# map config.local.yaml from current workdirectory into container
-	docker run --network=host -it --rm --name mqttcommanderephemeral -v $(pwd)/config.local.yaml:/app/config.local.yaml xomoxcc/mqttcommander:latest /bin/bash
+	docker run --network=host -it --rm --name mqttcommanderephemeral -v $$(pwd)/config.local.yaml:/app/config.local.yaml xomoxcc/mqttcommander:latest /bin/bash
 
 # From https://hatch.pypa.io/latest/publish/#authentication
 # HATCH_INDEX_USER and HATCH_INDEX_AUTH
