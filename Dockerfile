@@ -36,6 +36,18 @@ USER ${UNAME}
 ENV PATH="/home/pythonuser/.local/bin:$PATH"
 ENV PYTHONPATH=${PYTHONPATH:+${PYTHONPATH}:}/app
 
+COPY --chown=${UID}:${GID} <<EOF /home/pythonuser/.local/bin/mqttcommander
+#!/usr/local/bin/python3.14
+import sys
+from mqttcommander.cli import main
+if __name__ == '__main__':
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
+    sys.exit(main())
+EOF
+
+RUN chmod a+x /home/pythonuser/.local/bin/mqttcommander
+
 COPY --chown=${UID}:${GID} requirements.txt /
 RUN pip3 install --no-cache-dir --upgrade -r /requirements.txt
 
@@ -73,8 +85,9 @@ STOPSIGNAL SIGINT
 
 # ENTRYPOINT ["/bin/bash", "-c"]
 
-ENTRYPOINT ["tini", "--"]
+ENTRYPOINT ["tini", "--", "python", "main.py"]
+# CMD ["python", "main.py"]
+# CMD ["mqttcommander"]
 
-CMD ["python", "main.py"]
-# CMD ["tail", "-f", "/dev/null"]
+# CMD [""]
 
