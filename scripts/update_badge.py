@@ -30,10 +30,10 @@ def main() -> None:
     gist_token = os.environ["GIST_TOKEN"]
     gist_id = os.environ["GIST_ID"]
     repo_token = os.environ["REPO_TOKEN"]
-    repo_name = os.environ["GITHUB_REPOSITORY"]  # needs full repo-name with username e.g. vroomfondel/mqttstuff
+    repo_name = os.environ["GITHUB_REPOSITORY"]  # needs full repo-name with username e.g. vroomfondel/mqttcommander
 
-    history_filename = "mqttstuff_clone_history.json"
-    badge_filename = "mqttstuff_clone_count.json"
+    history_filename = "mqttcommander_clone_history.json"
+    badge_filename = "mqttcommander_clone_count.json"
 
     # --- 1. VERBINDUNG HERSTELLEN ---
     # Instanz für Gist (Schreibrechte via PAT)
