@@ -1,39 +1,68 @@
-![mypy and pytests](https://github.com/vroomfondel/mqttstuff/actions/workflows/mypynpytests.yml/badge.svg)
-[![BuildAndPushMultiarch](https://github.com/vroomfondel/mqttstuff/actions/workflows/buildmultiarchandpush.yml/badge.svg)](https://github.com/vroomfondel/mqttstuff/actions/workflows/buildmultiarchandpush.yml)
-![Cumulative Clones](https://img.shields.io/endpoint?logo=github&url=https://gist.githubusercontent.com/vroomfondel/8a315c36125952c9976548dfbf45cb7b/raw/mqttstuff_clone_count.json)
-[![Docker Pulls](https://img.shields.io/docker/pulls/xomoxcc/mqttstuff?logo=docker)](https://hub.docker.com/r/xomoxcc/mqttstuff/tags)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/mqttstuff?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=PyPi+Downloads)](https://pepy.tech/projects/mqttstuff)
+![mypy and pytests](https://github.com/vroomfondel/mqttcommander/actions/workflows/mypynpytests.yml/badge.svg)
+[![BuildAndPushMultiarch](https://github.com/vroomfondel/mqttcommander/actions/workflows/buildmultiarchandpush.yml/badge.svg)](https://github.com/vroomfondel/mqttcommander/actions/workflows/buildmultiarchandpush.yml)
+![Cumulative Clones](https://img.shields.io/endpoint?logo=github&url=https://gist.githubusercontent.com/vroomfondel/8a315c36125952c9976548dfbf45cb7b/raw/mqttcommander_clone_count.json)
+[![Docker Pulls](https://img.shields.io/docker/pulls/xomoxcc/mqttcommander?logo=docker)](https://hub.docker.com/r/xomoxcc/mqttcommander/tags)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/mqttcommander?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=PyPi+Downloads)](https://pepy.tech/projects/mqttcommander)
 
-[![https://github.com/vroomfondel/mqttstuff/raw/main/Gemini_Generated_Image_mqttstuff_wjpr8gwjpr8gwjpr_250x250.png](https://github.com/vroomfondel/mqttstuff/raw/main/Gemini_Generated_Image_mqttstuff_wjpr8gwjpr8gwjpr_250x250.png)](https://github.com/vroomfondel/mqttstuff)
+[![https://github.com/vroomfondel/mqttcommander/raw/main/Gemini_Generated_Image_mqttcommander_wjpr8gwjpr8gwjpr_250x250.png](https://github.com/vroomfondel/mqttcommander/raw/main/Gemini_Generated_Image_mqttcommander_wjpr8gwjpr8gwjpr_250x250.png)](https://github.com/vroomfondel/mqttcommander)
 
-# MQTTStuff
 
-Lightweight helper utilities for working with MQTT via Paho, with convenient wrappers for:
 
-- Connecting and subscribing to topics, including retained-message handling
-- Publishing one or many messages with consistent metadata and timestamps
-- Reading “last/most recent” messages with timeout-based collection and optional type conversion
+# MQTTCommander
+
+Convenience tools for discovering and commanding Tasmota devices over MQTT, plus a small CLI and a ready-to-use Docker image. This project now depends on the external library `mqttstuff` for the generic MQTT client/wrapper utilities — the `mqttstuff` source is no longer embedded in this repo and is pulled via the package manager.
+
+Key capabilities:
+
+- Connecting/subscribing and publishing via the `mqttstuff` wrapper
+- Reading “last/most recent” messages with timeout-based collection
 - Inspecting and commanding Tasmota devices via their MQTT topics
 - Pydantic-based configuration (YAML + environment overrides)
 - Developer helpers for JSON pretty-printing, deep updates, and logging configuration
 
-- Repository: https://github.com/vroomfondel/mqttstuff
-- Packages: `mqttstuff`, `mqttcommander`
+- This repository: `mqttcommander`
+- External dependency: `mqttstuff` (https://github.com/vroomfondel/mqttstuff)
 
 ## Overview
 
-MQTTStuff provides a higher-level interface over `paho-mqtt` to simplify common patterns:
+MQTTCommander builds on top of `paho-mqtt` through the external `mqttstuff` library to simplify common patterns:
 
-- A `MosquittoClientWrapper` to configure, connect, subscribe, and publish with minimal boilerplate
-- A `MQTTLastDataReader` utility to retrieve the most recent messages for one or more topics quickly
-- A `mqttcommander.tasmotacommander` toolkit to discover Tasmota devices from retained topics and interact with them in bulk
+- A `mqttstuff.mosquittomqttwrapper.MosquittoClientWrapper` to configure, connect, subscribe, and publish with minimal boilerplate
+- A `mqttstuff.mosquittomqttwrapper.MQTTLastDataReader` utility to retrieve the most recent messages quickly
+- A `mqttcommander.tasmotacommander.MqttCommander` toolkit to discover Tasmota devices from retained topics and interact with them in bulk
 - Pydantic settings in `config.py` to load credentials and broker details from `config.yaml`/`config.local.yaml` and/or environment
 
 The project also includes a Dockerfile for a batteries-included container image useful for testing and running these tools in a consistent environment.
 
+### Repository layout
+
+```
+.
+├─ mqttcommander/
+│  ├─ __init__.py
+│  ├─ cli.py
+│  ├─ tasmotacommander.py
+│  ├─ models.py
+│  ├─ Helper.py
+│  └─ py.typed
+├─ config.py                    # Pydantic settings + logging setup
+├─ main.py                      # Entry example/utility
+├─ requirements*.txt
+├─ pyproject.toml
+├─ Makefile
+├─ Dockerfile
+├─ config.yaml                  # default config (example)
+├─ config.local.yaml            # local overrides (git-ignored; example provided)
+└─ tests/
+```
+
 ## Installation
 
 Options:
+
+- From PyPI:
+  - `python -m pip install mqttcommander`
+  - This will also install `mqttstuff` as a dependency.
 
 - From source (editable):
   - `python -m venv .venv && source .venv/bin/activate`
@@ -101,7 +130,7 @@ The `Mqtt` section is expected to contain common fields like `host`, `port`, `us
 
 Each Python module provided by this repository is documented here with a focused explanation of its purpose and usage.
 
-### Module: `mqttstuff.mosquittomqttwrapper`
+### Module: `mqttstuff.mosquittomqttwrapper` (external dependency)
 
 Key classes and responsibilities:
 
@@ -167,15 +196,12 @@ Highlights:
 Example – list online devices and send a command:
 
 ```python
-from mqttcommander.tasmotacommander import (
-    get_all_tasmota_devices_from_retained,
-    filter_online_tasmotas_from_retained,
-    send_cmds_to_online_tasmotas,
-)
+from mqttcommander.tasmotacommander import MqttCommander
 
-all_devs = get_all_tasmota_devices_from_retained(topics=["tele/+/STATE"], noisy=False)
-online = filter_online_tasmotas_from_retained(all_devs)
-send_cmds_to_online_tasmotas(online, to_be_used_commands=["Power"], values_to_send=[["Toggle"]])
+comm = MqttCommander(host="localhost", port=1883, username="user", password="pass")
+all_devs = comm.get_all_tasmota_devices_from_retained(topics=["tele/+/STATE"], noisy=False)
+online = comm.filter_online_tasmotas_from_retained(all_devs)
+comm.send_cmds_to_online_tasmotas(online, to_be_used_commands=["Power"], values_to_send=[["Toggle"]])
 ```
 
 ### Module: `config`
@@ -230,7 +256,7 @@ The repository contains a ready-to-use Dockerfile at the repository root designe
 Basic build:
 
 ```bash
-docker build -t mqttstuff:local .
+docker build -t mqttcommander:local .
 ```
 
 Pass custom Python/Debian versions:
@@ -239,7 +265,7 @@ Pass custom Python/Debian versions:
 docker build \
   --build-arg python_version=3.12 \
   --build-arg debian_version=bookworm \
-  -t mqttstuff:py312 .
+  -t mqttcommander:py312 .
 ```
 
 Embed source metadata (useful in CI):
@@ -249,7 +275,7 @@ docker build \
   --build-arg gh_ref="${GITHUB_REF}" \
   --build-arg gh_sha="${GITHUB_SHA}" \
   --build-arg buildtime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -t mqttstuff:with-meta .
+  -t mqttcommander:with-meta .
 ```
 
 Multi-architecture build with buildx (example for amd64 and arm64):
@@ -257,7 +283,7 @@ Multi-architecture build with buildx (example for amd64 and arm64):
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/youruser/mqttstuff:latest \
+  -t ghcr.io/youruser/mqttcommander:latest \
   --push .
 ```
 
@@ -280,11 +306,11 @@ docker run --rm -it \
   -e LOGURU_LEVEL=INFO \
   -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  mqttstuff:local bash
+  mqttcommander:local bash
 
-# Run a Python one-liner using the wrapper
-docker run --rm -it mqttstuff:local \
-  python -c "from mqttstuff.mosquittomqttwrapper import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass','tele/+/STATE', retained='only'))"
+# Run a Python one-liner using the mqttstuff wrapper (installed as dependency)
+docker run --rm -it mqttcommander:local \
+  python -c "from mqttstuff.mosquittomqttwrapper import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
 ```
 
 ### Why Docker here is useful
@@ -303,7 +329,7 @@ Helpful `Makefile` targets:
 - `make tests` – run pytest
 - `make lint` – run Black code formatter
 - `make isort` – fix and check import order
-- `make tcheck` – run mypy type checks over `*.py`, `scripts/`, `mqttstuff/`, and `mqttcommander/`
+- `make tcheck` – run mypy type checks over `*.py`, `scripts/`, and `mqttcommander/`
 - `make commit-checks` – run pre-commit hooks on all files
 - `make prepare` – run tests and commit-checks (useful before committing/PRs)
 - `make pypibuild` – build sdist and wheel with Hatch into `dist/`
