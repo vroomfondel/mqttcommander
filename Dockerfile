@@ -73,9 +73,6 @@ ENV GITHUB_SHA=$gh_sha
 ARG buildtime=buildtime_is_undefined
 ENV BUILDTIME=$buildtime
 
-ARG forwarded_allow_ips=*
-ENV FORWARDED_ALLOW_IPS=$forwarded_allow_ips
-
 # ENV TINI_SUBREAPER=yes
 # ENV TINI_KILL_PROCESS_GROUP=yes
 # ENV TINI_VERBOSITY=3
