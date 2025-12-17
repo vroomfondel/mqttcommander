@@ -78,7 +78,7 @@ Options:
 Simple publish and subscribe using the wrapper:
 
 ```python
-from mqttstuff.mosquittomqttwrapper import MosquittoClientWrapper
+from mqttstuff import MosquittoClientWrapper
 
 client = MosquittoClientWrapper(
     host="localhost", port=1883, username="user", password="pass",
@@ -99,7 +99,7 @@ client.publish_one("test/topic", {"hello": "world"}, retain=False)
 Read last retained or recent messages with a timeout:
 
 ```python
-from mqttstuff.mosquittomqttwrapper import MQTTLastDataReader
+from mqttstuff import MQTTLastDataReader
 
 data = MQTTLastDataReader.get_most_recent_data_with_timeout(
     host="localhost", port=1883, username="user", password="pass",
@@ -130,7 +130,7 @@ The `Mqtt` section is expected to contain common fields like `host`, `port`, `us
 
 Each Python module provided by this repository is documented here with a focused explanation of its purpose and usage.
 
-### Module: `mqttstuff.mosquittomqttwrapper` (external dependency)
+### Package: `mqttstuff` (external dependency)
 
 Key classes and responsibilities:
 
@@ -158,7 +158,7 @@ Key classes and responsibilities:
 Example – per-topic callback with type conversion:
 
 ```python
-from mqttstuff.mosquittomqttwrapper import MosquittoClientWrapper
+from mqttstuff import MosquittoClientWrapper
 
 client = MosquittoClientWrapper(
     host="localhost", port=1883, username="user", password="pass",
@@ -173,7 +173,7 @@ client.add_message_callback("home/+/temperature", on_temperature, rettype="float
 client.connect_and_start_loop_forever()
 ```
 
-### Module: `mqttcommander.tasmotacommander`
+### Package: `mqttcommander`
 
 Tools to discover and command Tasmota devices using their MQTT topics.
 
@@ -196,7 +196,7 @@ Highlights:
 Example – list online devices and send a command:
 
 ```python
-from mqttcommander.tasmotacommander import MqttCommander
+from mqttcommander import MqttCommander
 
 comm = MqttCommander(host="localhost", port=1883, username="user", password="pass")
 all_devs = comm.get_all_tasmota_devices_from_retained(topics=["tele/+/STATE"], noisy=False)
@@ -296,21 +296,48 @@ docker buildx inspect --bootstrap
 
 ### Running the image
 
-The image uses `tini` as entrypoint and defaults to a no-op `tail -f /dev/null` command, so you can exec into it or run your own command.
+The image uses `tini` as entrypoint and runs the application by default via:
+
+```
+ENTRYPOINT ["tini", "--", "python", "main.py"]
+```
+
+Implications:
+
+- By default, the container starts `python main.py` inside `/app`.
+- To run a shell or the CLI instead, override the entrypoint with `--entrypoint`.
+- Environment variables like `MQTTSTUFF_CONFIG_DIR_PATH` can be used to point the app to your configs.
 
 Examples:
 
 ```bash
-# Run interactively and inspect
+# Run the default app (python main.py) with your config
 docker run --rm -it \
   -e LOGURU_LEVEL=INFO \
   -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
-  -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  mqttcommander:local bash
+  -v "$(pwd)/config.yaml:/app/config.yaml:ro" \
+  mqttcommander:local
+
+# Start a shell for inspection (override entrypoint)
+docker run --rm -it \
+  --entrypoint bash \
+  -e LOGURU_LEVEL=INFO \
+  -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
+  -v "$(pwd)/config.yaml:/app/config.yaml:ro" \
+  mqttcommander:local
+
+# Run the mqttcommander CLI directly
+docker run --rm -it \
+  --entrypoint mqttcommander \
+  -e LOGURU_LEVEL=INFO \
+  mqttcommander:local \
+  --host broker --port 1883 --username user --password pass list-online
 
 # Run a Python one-liner using the mqttstuff wrapper (installed as dependency)
-docker run --rm -it mqttcommander:local \
-  python -c "from mqttstuff.mosquittomqttwrapper import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
+docker run --rm -it \
+  --entrypoint python \
+  mqttcommander:local \
+  -c "from mqttstuff import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
 ```
 
 ### Why Docker here is useful
@@ -336,6 +363,60 @@ Helpful `Makefile` targets:
 - `make pypipush` – publish built artifacts with Hatch (configure credentials first)
 - `make build` – build the Docker image via `./build.sh`
 - `make dstart` – start ephemeral container (host network), mapping `config.local.yaml` into `/app`
+
+## TasmotaCommander usage examples
+
+### Via CLI
+
+The image and PyPI package install a console script `mqttcommander`. Common actions:
+
+```bash
+# 1) List discovered Tasmota devices from retained discovery topics
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  list-tasmotas
+
+# 2) Send a command to all online devices (e.g., toggle power)
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  send-cmd --command Power --values Toggle
+
+# Bonus) Show how many retained messages match default topics and print a few
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  list-retained
+
+# Bonus) Load previously saved device list (if present) and show count
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  readfromfile
+```
+
+When running inside Docker, use `--entrypoint mqttcommander` as shown above, and pass the same flags.
+
+### Via Python API
+
+Two additional examples that build on the `MqttCommander` API:
+
+```python
+# Example A: Read retained discovery/state data and print topic summary
+from mqttcommander import MqttCommander
+
+comm = MqttCommander(host="localhost", port=1883, username="user", password="pass")
+msgs = comm.get_all_retained(topics=["tasmota/discovery/#", "tele/+/STATE"], noisy=False, rettype="json")
+if msgs:
+    print(f"Collected {len(msgs)} retained messages")
+    for m in msgs[:5]:
+        print(m.topic)
+
+# Example B: Ensure timezone settings are correct on all online devices
+from mqttcommander import MqttCommander
+
+comm = MqttCommander(host="localhost", port=1883, username="user", password="pass")
+all_devs = comm.get_all_tasmota_devices_from_retained(noisy=False)
+online = comm.filter_online_tasmotas_from_retained(all_devs)
+comm.ensure_correct_timezone_settings_for_tasmotas(online)
+```
 
 ## Testing
 
