@@ -249,14 +249,13 @@ The repository contains a ready-to-use Dockerfile at the repository root designe
 - `UID`, `GID`, `UNAME` – user configuration in the image (defaults: 1234/1234/pythonuser)
 - `TARGETOS`, `TARGETARCH`, `TARGETPLATFORM` – auto-populated by BuildKit/buildx for multi-arch
 - `gh_ref`, `gh_sha`, `buildtime` – injected into environment variables (`GITHUB_REF`, `GITHUB_SHA`, `BUILDTIME`)
-- `forwarded_allow_ips` – forwarded IPs for proxied setups, default `*`
 
 ### Building the image
 
 Basic build:
 
 ```bash
-docker build -t mqttcommander:local .
+docker build -t xomoxcc/mqttcommander:latest .
 ```
 
 Pass custom Python/Debian versions:
@@ -265,7 +264,7 @@ Pass custom Python/Debian versions:
 docker build \
   --build-arg python_version=3.12 \
   --build-arg debian_version=bookworm \
-  -t mqttcommander:py312 .
+  -t xomoxcc/mqttcommander:py312 .
 ```
 
 Embed source metadata (useful in CI):
@@ -275,7 +274,7 @@ docker build \
   --build-arg gh_ref="${GITHUB_REF}" \
   --build-arg gh_sha="${GITHUB_SHA}" \
   --build-arg buildtime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -t mqttcommander:with-meta .
+  -t xomoxcc/mqttcommander:with-meta .
 ```
 
 Multi-architecture build with buildx (example for amd64 and arm64):
@@ -283,7 +282,7 @@ Multi-architecture build with buildx (example for amd64 and arm64):
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/youruser/mqttcommander:latest \
+  -t ghcr.io/youruser/xomoxcc-mqttcommander:latest \
   --push .
 ```
 
@@ -305,18 +304,19 @@ ENTRYPOINT ["tini", "--", "python", "main.py"]
 Implications:
 
 - By default, the container starts `python main.py` inside `/app`.
-- To run a shell or the CLI instead, override the entrypoint with `--entrypoint`.
+- To run a shell or the CLI directly instead, override the entrypoint with `--entrypoint`.
 - Environment variables like `MQTTSTUFF_CONFIG_DIR_PATH` can be used to point the app to your configs.
+- main.py is a wrapper to inject values read from config.yaml/config.local.yaml/ENV (in that order; "the latter overrides values from the earlier") into the call to mqttcommander.cli:main
 
 Examples:
 
 ```bash
-# Run the default app (python main.py) with your config
+# Run the default app (python main.py via tini) with your config
 docker run --rm -it \
   -e LOGURU_LEVEL=INFO \
   -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
-  -v "$(pwd)/config.yaml:/app/config.yaml:ro" \
-  mqttcommander:local
+  -v "$(pwd)/config.local.yaml:/app/config.local.yaml:ro" \
+  xomoxcc/mqttcommander:latest
 
 # Start a shell for inspection (override entrypoint)
 docker run --rm -it \
@@ -324,21 +324,23 @@ docker run --rm -it \
   -e LOGURU_LEVEL=INFO \
   -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
   -v "$(pwd)/config.yaml:/app/config.yaml:ro" \
-  mqttcommander:local
+  xomoxcc/mqttcommander:latest
 
 # Run the mqttcommander CLI directly
 docker run --rm -it \
   --entrypoint mqttcommander \
   -e LOGURU_LEVEL=INFO \
-  mqttcommander:local \
+  xomoxcc/mqttcommander:latest \
   --host broker --port 1883 --username user --password pass list-online
 
 # Run a Python one-liner using the mqttstuff wrapper (installed as dependency)
 docker run --rm -it \
   --entrypoint python \
-  mqttcommander:local \
+  xomoxcc/mqttcommander:latest \
   -c "from mqttstuff import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
 ```
+
+Recommendation: You should always try to run python through an entrypoint via tini to ensure proper signal handling from outside the container (STOP/KILL/TERM/INT) 
 
 ### Why Docker here is useful
 
