@@ -34,7 +34,8 @@ RUN groupadd -g ${GID} -o ${UNAME} && \
 USER ${UNAME}
 
 ENV PATH="/home/pythonuser/.local/bin:$PATH"
-ENV PYTHONPATH=${PYTHONPATH:+${PYTHONPATH}:}/app
+# ENV PYTHONPATH=${PYTHONPATH:+${PYTHONPATH}:}/app
+ENV PYTHONPATH=/app
 
 COPY --chown=${UID}:${GID} <<EOF /home/pythonuser/.local/bin/mqttcommander
 #!/usr/local/bin/python3.14
