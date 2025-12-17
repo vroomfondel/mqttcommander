@@ -33,7 +33,8 @@ from mqttcommander.models import (
     TasmotaTimeZoneDSTSTD,
 )
 
-from loguru import logger as glogger, Logger
+import loguru
+from loguru import logger as glogger
 
 glogger.debug(f"{__name__} DEBUG")
 glogger.info(f"{__name__} INFO")
@@ -71,7 +72,7 @@ class MqttCommander:
         cmdsent: Internal flag indicating that a command was sent in current session.
     """
 
-    logger: ClassVar[Logger] = glogger.bind(classname=__qualname__)
+    logger: ClassVar["loguru.Logger"] = glogger.bind(classname=__qualname__)
     _msg_topicname_startwith_drop_filter_defaultset: ClassVar[Set[str]] = {"tele/rtl_433"}
 
     # TODO ADD RECEIVE_TRIGGERS
