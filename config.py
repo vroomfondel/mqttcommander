@@ -1,3 +1,10 @@
+"""Configuration models and settings loading for mqttcommander.
+
+Defines pydantic models for Redis and MQTT configuration and a `Settings`
+class that loads from YAML files and environment variables. Google-style
+docstrings are used throughout.
+"""
+
 import datetime
 
 import os
@@ -108,12 +115,16 @@ from pydantic_settings import (
 
 
 class Redis(BaseModel):
+    """Redis connection configuration."""
+
     host: str = Field(default="127.0.0.1")
     host_in_cluster: Optional[str] = Field(default=None)
     port: int = Field(default=6379)
 
 
 class Mqtt(BaseModel):
+    """MQTT broker credentials and connection details."""
+
     host: str = Field(default="127.0.0.1")
     port: int = Field(default=1883)
     username: str = Field()
@@ -183,6 +194,13 @@ class Mqtt(BaseModel):
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from YAML and environment variables.
+
+    Attributes:
+        redis: Redis configuration section.
+        mqtt: MQTT configuration section.
+    """
+
     # model_config = SettingsConfigDict(env_prefix='TAS_', case_sensitive=False, env_file='.env', env_file_encoding='utf-8')
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         populate_by_name=True,
@@ -212,6 +230,18 @@ class Settings(BaseSettings):
         dotenv_settings: DotEnvSettingsSource,  # type: ignore
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        """Customize settings sources order (init args, env, then YAML files).
+
+        Args:
+            settings_cls: The settings class.
+            init_settings: In-code initialization settings source.
+            env_settings: Environment settings source.
+            dotenv_settings: Dotenv file settings source.
+            file_secret_settings: File secrets (unused).
+
+        Returns:
+            tuple[PydanticBaseSettingsSource, ...]: Ordered sources to use.
+        """
         # return init_settings, MyEnvSettingsSource.from_other(env_settings), YamlConfigSettingsSource(settings_cls)
         return init_settings, env_settings, YamlConfigSettingsSource(settings_cls)
 
