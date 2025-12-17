@@ -120,9 +120,9 @@ Configuration is defined with Pydantic Settings in `config.py` and loaded from:
 
 You can override paths with environment variables:
 
-- `MQTTSTUFF_CONFIG_DIR_PATH` – base config dir
-- `MQTTSTUFF_CONFIG_PATH` – path to main YAML config
-- `MQTTSTUFF_CONFIG_LOCAL_PATH` – path to local override YAML
+- `MQTTCOMMANDER_CONFIG_DIR_PATH` – base config dir
+- `MQTTCOMMANDER_CONFIG_PATH` – path to main YAML config
+- `MQTTCOMMANDER_CONFIG_LOCAL_PATH` – path to local override YAML
 
 The `Mqtt` section is expected to contain common fields like `host`, `port`, `username`, `password`, and optional topic lists. See the file headers in `config.py` for details.
 
@@ -209,7 +209,7 @@ comm.send_cmds_to_online_tasmotas(online, to_be_used_commands=["Power"], values_
 - Centralized configuration and Loguru logging setup
 - Uses `pydantic-settings` to read from environment and YAML
 - Timezone helpers and constants (e.g., `TZBERLIN`)
-- Environment variables `LOGURU_LEVEL`, `MQTTSTUFF_CONFIG_*` are respected
+- Environment variables `LOGURU_LEVEL`, `MQTTCOMMANDER_CONFIG_*` are respected
 
 Typical usage:
 
@@ -305,7 +305,7 @@ Implications:
 
 - By default, the container starts `python main.py` inside `/app`.
 - To run a shell or the CLI directly instead, override the entrypoint with `--entrypoint`.
-- Environment variables like `MQTTSTUFF_CONFIG_DIR_PATH` can be used to point the app to your configs.
+- Environment variables like `MQTTCOMMANDER_CONFIG_DIR_PATH` can be used to point the app to your configs.
 - main.py is a wrapper to inject values read from config.yaml/config.local.yaml/ENV (in that order; "the latter overrides values from the earlier") into the call to mqttcommander.cli:main
 
 Examples:
@@ -314,33 +314,41 @@ Examples:
 # Run the default app (python main.py via tini) with your config
 docker run --rm -it \
   -e LOGURU_LEVEL=INFO \
-  -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
+  -e MQTTCOMMANDER_CONFIG_DIR_PATH=/app \
   -v "$(pwd)/config.local.yaml:/app/config.local.yaml:ro" \
   xomoxcc/mqttcommander:latest
 
 # Start a shell for inspection (override entrypoint)
 docker run --rm -it \
-  --entrypoint bash \
-  -e LOGURU_LEVEL=INFO \
-  -e MQTTSTUFF_CONFIG_DIR_PATH=/app \
+  -e LOGURU_LEVEL=DEBUG \
+  -e MQTTCOMMANDER_CONFIG_DIR_PATH=/app \
   -v "$(pwd)/config.yaml:/app/config.yaml:ro" \
-  xomoxcc/mqttcommander:latest
+  --entrypoint tini xomoxcc/mqttcommander:latest -- \
+  /bin/bash
 
 # Run the mqttcommander CLI directly
 docker run --rm -it \
-  --entrypoint mqttcommander \
-  -e LOGURU_LEVEL=INFO \
-  xomoxcc/mqttcommander:latest \
-  --host broker --port 1883 --username user --password pass list-online
+  -e LOGURU_LEVEL=DEBUG \
+  --entrypoint tini xomoxcc/mqttcommander:latest -- \
+  mqttcommander --host broker --port 1883 --username user --password pass list-online
 
 # Run a Python one-liner using the mqttstuff wrapper (installed as dependency)
 docker run --rm -it \
-  --entrypoint python \
-  xomoxcc/mqttcommander:latest \
-  -c "from mqttstuff import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
+  --entrypoint tini xomoxcc/mqttcommander:latest -- \
+  python -c "from mqttstuff import MQTTLastDataReader as R; print(R.get_most_recent_data_with_timeout('broker',1883,'user','pass',['tele/+/STATE'], retained='only'))"
 ```
 
-Recommendation: You should always try to run python through an entrypoint via tini to ensure proper signal handling from outside the container (STOP/KILL/TERM/INT) 
+Recommendation: You should always try to run python(especially python, but imho all other processes as well) through an entrypoint via tini to ensure proper signal handling (STOP/KILL/TERM/INT) and process reaping for/inside the conainer.
+```bash
+# Run the default app (python main.py via tini) with your config
+docker run --rm -it \
+  --network=host \
+  -e LOGURU_LEVEL=DEBUG \  
+  -v "$(pwd)/config.local.yaml:/app/config.local.yaml:ro" \  
+  --entrypoint tini xomoxcc/mqttcommander:latest -- \
+  python main.py list-retained --grace-s 10
+```
+
 
 ### Why Docker here is useful
 
@@ -384,14 +392,26 @@ mqttcommander \
   send-cmd --command Power --values Toggle
 
 # Bonus) Show how many retained messages match default topics and print a few
+#        Optional: increase receive window and enable verbose output
 mqttcommander \
   --host broker --port 1883 --username user --password pass \
   list-retained
 
+# with options:
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  list-retained --grace-s 10 --noisy
+
 # Bonus) Load previously saved device list (if present) and show count
+#        Optional: specify custom snapshot directory and timezone
 mqttcommander \
   --host broker --port 1883 --username user --password pass \
   readfromfile
+
+# with options:
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  readfromfile --tasmota-json-dir /path/to/snapshots --timezone Europe/Berlin
 ```
 
 When running inside Docker, use `--entrypoint mqttcommander` as shown above, and pass the same flags.
