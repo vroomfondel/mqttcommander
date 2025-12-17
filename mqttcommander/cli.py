@@ -30,7 +30,7 @@ def _run(
     tasmota_json_dir: Optional[Path] = None,
     timezone_name: Optional[str] = None,
     retained_msgs_receive_grace_s: Optional[int] = None,
-    noisy: Optional[bool] = None
+    noisy: Optional[bool] = None,
 ) -> None:
     """Execute the requested CLI action.
 
@@ -79,7 +79,9 @@ def _run(
         case "list-retained":
             retained_msgs_receive_grace_s = retained_msgs_receive_grace_s or 5
             noisy = False if not noisy else True
-            msgs = comm.get_all_retained(retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s*1000, noisy=noisy)
+            msgs = comm.get_all_retained(
+                retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000, noisy=noisy
+            )
             cnt = 0 if msgs is None else len(msgs)
             print(f"Retained messages matching topics {comm.topics}: {cnt}")
             if msgs:

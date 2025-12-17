@@ -23,9 +23,6 @@ if __name__ == "__main__":
         settings.mqtt.username,
         "--password",
         settings.mqtt.password,
-        # "list-online"
-        # Weitere CLI-Args hier, z.B.:
-        # "list-online"
     ]
 
     # remaining argv are just passed in...
