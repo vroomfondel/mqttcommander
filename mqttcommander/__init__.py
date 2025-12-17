@@ -6,6 +6,7 @@ from typing import Callable, Dict, Any
 
 from loguru import logger as glogger
 
+print(f"logger disabling: {__name__}")
 glogger.disable(__name__)
 
 
