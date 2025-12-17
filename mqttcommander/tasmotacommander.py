@@ -1,3 +1,11 @@
+"""High-level commands to interact with Tasmota devices over MQTT.
+
+This module provides the `MqttCommander` class which can read retained
+discovery/state messages, determine online devices, and send commands while
+collecting the responses. It also includes helpers to persist and reload
+discovered devices as JSON files.
+"""
+
 import difflib
 import json
 import os
@@ -7,11 +15,11 @@ import threading
 from datetime import datetime, tzinfo
 from io import StringIO
 from pathlib import Path
-from typing import Any, Literal, Set, Optional, List, Dict, ClassVar, Tuple, Annotated
+from typing import Any, Literal, Set, Optional, List, Dict, ClassVar
 
 from mqttstuff import MWMqttMessage, MosquittoClientWrapper, MQTTLastDataReader
 
-from loguru import logger
+
 import pytz
 
 import Helper
@@ -25,8 +33,10 @@ from mqttcommander.models import (
     TasmotaTimeZoneDSTSTD,
 )
 
-logger.debug(f"{__name__} DEBUG")
-logger.info(f"{__name__} INFO")
+from loguru import logger as glogger, Logger
+
+glogger.debug(f"{__name__} DEBUG")
+glogger.info(f"{__name__} INFO")
 
 
 # print(maca.model_dump())
@@ -43,7 +53,25 @@ TASMOTA_LWT_TOPIC_END: str = "LWT"
 
 
 class MqttCommander:
-    logger: ClassVar = logger.bind(classname=__qualname__)
+    """Convenience wrapper around an MQTT client for Tasmota management.
+
+    Args:
+        topics: Topic filters to subscribe to. Defaults to discovery and LWT topics.
+        msg_topicname_startwith_drop_filter: Set of topic prefixes to ignore.
+        mqttclient: Existing MQTT client wrapper. If not provided, connection
+            settings must be given.
+        host: MQTT host when creating a client.
+        port: MQTT port when creating a client.
+        username: MQTT username when creating a client.
+        password: MQTT password when creating a client.
+
+    Attributes:
+        topics: Active topic subscriptions used when reading retained data or looping.
+        mqttclient: Underlying MQTT client wrapper.
+        cmdsent: Internal flag indicating that a command was sent in current session.
+    """
+
+    logger: ClassVar[Logger] = glogger.bind(classname=__qualname__)
     _msg_topicname_startwith_drop_filter_defaultset: ClassVar[Set[str]] = {"tele/rtl_433"}
 
     # TODO ADD RECEIVE_TRIGGERS
@@ -88,6 +116,14 @@ class MqttCommander:
         self.cmdsent: bool = False
 
     def apply_topic_filter(self, msgs: list[MWMqttMessage] | None) -> list[MWMqttMessage] | None:
+        """Filter messages by dropping those whose topic starts with a blocked prefix.
+
+        Args:
+            msgs: List of received messages or ``None``.
+
+        Returns:
+            list | None: Filtered list or ``None`` if empty/``None`` input.
+        """
         if self.msg_topicname_startwith_drop_filter is None or msgs is None:
             return msgs
 
@@ -110,6 +146,21 @@ class MqttCommander:
         rettype: Literal["json", "str", "int", "float", "valuemsg", "str_raw"] = "str_raw",
         fallback_rettype: Literal["json", "str", "int", "float", "valuemsg", "str_raw"] = "str_raw",
     ) -> list[MWMqttMessage] | None:
+        """Return retained messages for the given topic filters.
+
+        Args:
+            topics: Topic filters to query; defaults to `self.topics`.
+            retained_msgs_receive_grace_ms: Wait time in ms to collect retained messages.
+            noisy: Enable verbose logging in lower layers.
+            rettype: Preferred return value type for message decoding.
+            fallback_rettype: Fallback type if decoding fails.
+
+        Returns:
+            list[MWMqttMessage] | None: Retained messages or ``None`` if none received.
+        """
+
+        logger = self.__class__.logger
+        logger = logger.bind(skiplog=not noisy)
 
         if topics is None:
             topics = self.topics
@@ -145,11 +196,22 @@ class MqttCommander:
     def start_loop_forever(
         self, rettype: Literal["json", "str", "int", "float", "valuemsg", "str_raw"] = "str_raw"
     ) -> None:
+        """Start the MQTT network loop and forward messages to `on_msg_received`.
+
+        Args:
+            rettype: Decoding mode for incoming messages.
+        """
         # self.mqttclient.add_message_callback("tele/tasmota_183BAA/LWT", self.on_msg_received)
         self.mqttclient.set_on_msg_callback(self.on_msg_received, rettype=rettype)
         self.mqttclient.connect_and_start_loop_forever(topics=self.topics)
 
     def on_msg_received(self, msg: MWMqttMessage, userdata: Any) -> None:
+        """Default callback used while looping to log received messages.
+
+        Args:
+            msg: Received MQTT message.
+            userdata: Optional user data passed by the client.
+        """
         if self.msg_topicname_startwith_drop_filter is not None:
             for sw in self.msg_topicname_startwith_drop_filter:
                 if msg.topic.startswith(sw):
@@ -163,6 +225,17 @@ class MqttCommander:
         to_be_used_commands: List[str] | None = None,
         values_to_send: List[List[str | float | dict | int] | None] | None = None,
     ) -> List[TasmotaDevice]:
+        """Send commands to all online Tasmota devices and collect responses.
+
+        Args:
+            tasmotas: Devices to target.
+            to_be_used_commands: Command names in order; defaults to a standard set.
+            values_to_send: Parallel list of values per device (or ``None`` to query status).
+
+        Returns:
+            list[TasmotaDevice]: The input list with updated fields populated from responses.
+        """
+        logger = self.__class__.logger
         to_be_used_commands = to_be_used_commands or [
             "RULE1",
             "RULE2",
@@ -392,6 +465,19 @@ class MqttCommander:
     def ensure_correct_timezone_settings_for_tasmotas(
         self, online_tasmotas: List[TasmotaDevice], timezoneconfig: Optional[TasmotaTimezoneConfig] = None
     ) -> List[TasmotaDevice]:
+        """Ensure timezone-related settings are aligned on online devices.
+
+        Builds the appropriate command/value lists and delegates to
+        `send_cmds_to_online_tasmotas`.
+
+        Args:
+            online_tasmotas: Devices assumed to be online.
+            timezoneconfig: Desired timezone configuration; defaults to project standard.
+
+        Returns:
+            list[TasmotaDevice]: Devices after applying the timezone update.
+        """
+        logger = self.__class__.logger
         timezoneconfig = timezoneconfig or TasmotaTimezoneConfig(
             latitude=53.6437753,
             longitude=9.8940783,
@@ -432,6 +518,16 @@ class MqttCommander:
         )
 
     def update_online_tasmotas(self, tasmotas: List[TasmotaDevice]) -> List[TasmotaDevice]:
+        """Query a set of devices and return only those that are online with fresh data.
+
+        Args:
+            tasmotas: Devices to check.
+
+        Returns:
+            list[TasmotaDevice]: Online devices with updated fields.
+        """
+        logger = self.__class__.logger
+
         tasmota_online: List[TasmotaDevice] = []
 
         for tdo in tasmotas:
@@ -459,8 +555,15 @@ class MqttCommander:
 
         return tasmota_online
 
-    def read_tasmotas_from_file_update_save_to_file(self) -> None:
-        tds: List[TasmotaDevice] | None = read_tasmotas_from_latest_file()
+    def read_tasmotas_from_file_update_save_to_file(
+        self, tasmota_json_dir: Path | None = None, timezone: tzinfo = pytz.timezone("Europe/Berlin")
+    ) -> None:
+        """Load last saved devices, update online ones, and persist back to file."""
+        logger = self.__class__.logger
+
+        tds: List[TasmotaDevice] | None = read_tasmotas_from_latest_file(
+            tasmota_json_dir=tasmota_json_dir, timezone=timezone
+        )
 
         if not tds:
             return
@@ -505,6 +608,19 @@ class MqttCommander:
     def get_all_tasmota_devices_from_retained(
         self, topics: List[str] | None = None, noisy: bool = False, noisy_lowerlevel: bool = False
     ) -> list[TasmotaDevice]:
+        """Build a device list from retained discovery and LWT messages.
+
+        Args:
+            topics: Topic filters to use for discovery; defaults to `TASMOTA_DEFAULT_TOPICS`.
+            noisy: Enable high-level debug logging.
+            noisy_lowerlevel: Enable lower-level debug logging when reading retained.
+
+        Returns:
+            list[TasmotaDevice]: Aggregated device models.
+        """
+        logger = self.__class__.logger
+        logger = logger.bind(skiplog=not noisy)
+
         topics = topics or TASMOTA_DEFAULT_TOPICS
         ret: list[TasmotaDevice] = []
 
@@ -590,6 +706,17 @@ class MqttCommander:
     def filter_online_tasmotas_from_retained(
         self, all_tasmotas: List[TasmotaDevice], update_lwt_current_value: bool = True
     ) -> List[TasmotaDevice]:
+        """Return only those devices from the list that are currently online.
+
+        Args:
+            all_tasmotas: Devices to filter.
+            update_lwt_current_value: If True, update objects' LWT with current retained values.
+
+        Returns:
+            list[TasmotaDevice]: Online devices.
+        """
+        logger = self.__class__.logger
+
         all_online_tasmotas: List[TasmotaDevice] = self.get_all_tasmota_devices_from_retained()
 
         online_topics: Dict[str, Literal["Online", "Offline"] | None] = {}
@@ -623,6 +750,18 @@ def write_tasmota_devices_file(
     noisy: bool = False,
     timezone: tzinfo = pytz.timezone("Europe/Berlin"),
 ) -> Path:
+    """Write discovered devices to a timestamped JSON file.
+
+    Args:
+        tasmotas: Devices to serialize.
+        fp: Optional file path; if not provided a path under ``tasmotas`` is created.
+        noisy: Whether to log the generated JSON for each device.
+        timezone: Timezone used to build the timestamped filename.
+
+    Returns:
+        Path: The file path written.
+    """
+    logger = glogger.bind(skiplog=not noisy)
     if fp is None:
         fp = Path(__file__)
         fp = Path(fp.parent.resolve(), "tasmotas")
@@ -657,13 +796,30 @@ def write_tasmota_devices_file(
 
 
 def read_tasmotas_from_latest_file(
-    tasmota_json_dir: Path | None = None, noisy: bool = False, timezone: tzinfo = pytz.timezone("Europe/Berlin")
+    tasmota_json_dir: Path | None = None, timezone: tzinfo = pytz.timezone("Europe/Berlin"), noisy: bool = False
 ) -> Optional[List[TasmotaDevice]]:
+    """Read the most recent tasmota devices JSON file.
+
+    Args:
+        tasmota_json_dir: Directory containing JSON snapshots; defaults to package ``tasmotas`` dir or ``~/.tasmotacommander/tasmotas`` for installed modules.
+        noisy: If True, log discovered files with their timestamps.
+        timezone: Timezone for pretty timestamp display.
+
+    Returns:
+        Optional[List[TasmotaDevice]]: Parsed devices or ``None`` if no file is found.
+    """
+    logger = glogger.bind(skiplog=not noisy)
+
     if tasmota_json_dir is None:
-        tasmota_json_dir = Path(__file__)
-        tasmota_json_dir = Path(tasmota_json_dir.parent.resolve(), "tasmotas")
-        if not tasmota_json_dir.exists():
-            tasmota_json_dir.mkdir()
+        tasmota_json_dir = Path(__file__).parent.resolve()
+        if tasmota_json_dir.name != "mqttcommander":
+            # presumably install via pypi as module
+            tasmota_json_dir = Path(Path.home(), ".tasmotacommander")
+
+        tasmota_json_dir = Path(tasmota_json_dir, "tasmotas")
+
+    if not tasmota_json_dir.exists():
+        tasmota_json_dir.mkdir(parents=True)
 
     jsonfiles: List[Path] = [fm for fm in tasmota_json_dir.glob("tasmota_devices_*json")]
     jsonfiles = sorted(jsonfiles, key=lambda p: os.stat(p).st_mtime, reverse=True)
