@@ -1,3 +1,11 @@
+"""Data models for Tasmota devices and configuration.
+
+This module defines pydantic-based models used to parse and generate
+Tasmota discovery/configuration payloads as seen on MQTT. It also provides
+helpers to convert between rich models and the compact command formats
+expected by Tasmota.
+"""
+
 from datetime import datetime
 from io import StringIO
 from typing import Optional, Annotated, List, Literal, Any, Self
@@ -8,6 +16,19 @@ from pydantic_extra_types.mac_address import MacAddress
 
 
 class TasmotaTimerConfig(BaseModel):
+    """Timer configuration for Tasmota devices.
+
+    Attributes:
+        enable: Whether the timer is armed (1) or disabled (0).
+        mode: Time base for the timer (0=clock, 1=sunrise, 2=sunset).
+        time: Specific time (``hh:mm``) for mode 0, or ``+/-hh:mm`` offset for modes 1/2.
+        window: Random minutes added/subtracted around ``time`` (0..15).
+        days: Seven-character mask indicating enabled weekdays (e.g. ``1111111``).
+        repeat: Whether the timer repeats (1) or fires once (0).
+        output: Output channel 1..16 if no rule is enabled.
+        action: Output action (0=OFF, 1=ON, 2=TOGGLE, 3=RULE/BLINK).
+    """
+
     # Enable	0 = disarm or disable timer
     # 1 = arm or enable timer
     enable: Optional[Annotated[int, Field(ge=0, le=1)]] = Field(None, validation_alias=AliasChoices("Enable", "enable"))
@@ -56,6 +77,17 @@ class TasmotaTimerConfig(BaseModel):
 
 
 class TasmotaTimeZoneDSTSTD(BaseModel):
+    """DST/STD rule used by Tasmota timezone configuration.
+
+    Attributes:
+        hemisphere: Hemisphere indicator used by Tasmota.
+        week: Week of month where the switch occurs.
+        month: Month number.
+        day: Day of week.
+        hour: Hour of switch.
+        offset: Offset minutes from UTC.
+    """
+
     hemisphere: Optional[int] = Field(None, validation_alias=AliasChoices("Hemisphere", "hemisphere"))
     week: Optional[int] = Field(None, validation_alias=AliasChoices("Week", "week"))
     month: Optional[int] = Field(None, validation_alias=AliasChoices("Month", "month"))
@@ -64,10 +96,26 @@ class TasmotaTimeZoneDSTSTD(BaseModel):
     offset: Optional[int] = Field(None, validation_alias=AliasChoices("Offset", "offset"))
 
     def to_tasmota_command_string(self) -> str:
+        """Return Tasmota command string for this DST/STD rule.
+
+        Returns:
+            str: Compact Tasmota list representation without spaces.
+        """
         return str([self.hemisphere, self.week, self.month, self.day, self.hour, self.offset]).replace(" ", "")
 
     @classmethod
     def from_tasmota_command_string(cls, values_comma_separated: str) -> TasmotaTimeZoneDSTSTD:
+        """Create an instance from a Tasmota command string.
+
+        Args:
+            values_comma_separated: Comma-separated values (6 elements).
+
+        Returns:
+            TasmotaTimeZoneDSTSTD: Parsed rule instance.
+
+        Raises:
+            AssertionError: If input does not contain exactly 6 values.
+        """
         data: List[str] = values_comma_separated.split(",")
 
         assert len(data) == 6
@@ -83,6 +131,16 @@ class TasmotaTimeZoneDSTSTD(BaseModel):
 
 
 class TasmotaTimezoneConfig(BaseModel):
+    """Full timezone configuration for a Tasmota device.
+
+    Attributes:
+        latitude: Latitude used for sunrise/sunset calculations.
+        longitude: Longitude used for sunrise/sunset calculations.
+        timedst: Daylight saving rule.
+        timestd: Standard time rule.
+        timezone: Numeric code or ``+HH:MM`` string.
+    """
+
     latitude: Optional[float] = Field(None, validation_alias=AliasChoices("Latitude", "latitude"))
     longitude: Optional[float] = Field(None, validation_alias=AliasChoices("Longitude", "longitude"))
     timedst: Optional[TasmotaTimeZoneDSTSTD] = Field(None, validation_alias=AliasChoices("TimeDst", "timedst"))
@@ -90,6 +148,14 @@ class TasmotaTimezoneConfig(BaseModel):
     timezone: Optional[int | str] = Field(None, validation_alias=AliasChoices("Timezone", "timezone"))  # 99 | +01:00
 
     def as_tasmota_command_list(self) -> List[str | float | dict[Any, Any] | int] | None:
+        """Return configuration as a Tasmota command list.
+
+        Returns:
+            list: List containing latitude, longitude, dst rule, std rule, and timezone.
+
+        Raises:
+            AssertionError: If any required field is missing.
+        """
         assert (
             self.latitude is not None
             and self.longitude is not None
@@ -107,10 +173,37 @@ class TasmotaTimezoneConfig(BaseModel):
         ]
 
     def to_tasmota_command_string(self) -> str:
+        """Return compact Tasmota command string for this timezone config.
+
+        Returns:
+            str: Compact list string without spaces.
+        """
         return str(self.as_tasmota_command_list()).replace(" ", "")
 
 
 class TasmotaDeviceConfig(BaseModel):
+    """Configuration and metadata for a single Tasmota device.
+
+    Attributes:
+        friendly_name: Human-friendly device name.
+        device_name: Internal device name.
+        hostname: Hostname of the device.
+        manufacturer_description: Free-text device/manufacturer description.
+        ip: IPv4 address of the device.
+        mac: MAC address of the device.
+        offline_msg: LWT value that indicates offline.
+        online_msg: LWT value that indicates online.
+        state: Optional reported state list.
+        topic: Root MQTT topic for the device.
+        tp: Topic parts reported by discovery.
+        software_version: Firmware/software version string.
+        timezoneconfig: Optional timezone configuration.
+        teleperiod: Telemetry period in seconds.
+        powerdelta1: Power delta threshold 1.
+        setoption4: Serial log output option.
+        timer1..timer4: Optional timer configurations.
+    """
+
     friendly_name: Optional[str] = Field(
         None, validation_alias=AliasChoices("friendly_name", AliasPath("fn", 0))
     )  # friendly name -> first element of list of strings?
@@ -148,6 +241,14 @@ class TasmotaDeviceConfig(BaseModel):
     @field_validator("mac", mode="before")
     @classmethod
     def validate_mac(cls, v: Any) -> Optional[str]:
+        """Normalize MAC address before validation.
+
+        Args:
+            v: Input MAC as string or ``None``.
+
+        Returns:
+            Optional[str]: Normalized MAC with colons or ``None``.
+        """
         # logger.debug(f"VALIDATE MAC: {v}")
         if not v:
             return None
@@ -156,6 +257,14 @@ class TasmotaDeviceConfig(BaseModel):
 
     @staticmethod
     def mac_no_colon_to_colon(mac: str) -> str:
+        """Convert a MAC like ``AABBCCDDEEFF`` to ``AA:BB:CC:DD:EE:FF``.
+
+        Args:
+            mac: MAC address without separators, or already colon-formatted.
+
+        Returns:
+            str: Colon-separated MAC address.
+        """
         if mac.find(":") == 2:
             return mac
 
@@ -169,6 +278,16 @@ class TasmotaDeviceConfig(BaseModel):
 
 
 class TasmotaRule(BaseModel):
+    """Represents the on-device rule configuration/state for Tasmota.
+
+    Attributes:
+        state: Whether the rule set is enabled.
+        once: Whether a rule triggers only once.
+        stoponerror: Whether to stop processing on error.
+        length: Length of the rules content.
+        rules: Raw rules string.
+    """
+
     state: Optional[Literal["ON", "OFF"]] = Field(None, validation_alias=AliasChoices("State", "state"))
     once: Optional[Literal["ON", "OFF"]] = Field(None, validation_alias=AliasChoices("Once", "once"))
     stoponerror: Optional[Literal["ON", "OFF"]] = Field(
@@ -179,6 +298,12 @@ class TasmotaRule(BaseModel):
 
 
 class TasmotaDeviceSensors(BaseModel):
+    """Generic sensors payload for a Tasmota device.
+
+    Attributes:
+        time: Report time of the sensor snapshot.
+    """
+
     # tasmota/discovery/x/sensors
     # sn: dict
     time: datetime = Field(..., validation_alias=AliasChoices("time", "Time", AliasPath("sn", "Time")))
@@ -188,6 +313,17 @@ class TasmotaDeviceSensors(BaseModel):
 
 
 class TasmotaDevice(BaseModel):
+    """Aggregate information known about a Tasmota device.
+
+    Attributes:
+        tasmota_config: Discovery/configuration information.
+        tasmota_sensors: Last known sensors snapshot.
+        tasmota_rule1: Rule 1 configuration.
+        tasmota_rule2: Rule 2 configuration.
+        tasmota_rule3: Rule 3 configuration.
+        lwt_current_value: Last will testament value reported for device.
+    """
+
     # tasmota/discovery/x/config
     tasmota_config: Optional[TasmotaDeviceConfig] = None
     tasmota_sensors: Optional[TasmotaDeviceSensors] = None
@@ -198,6 +334,18 @@ class TasmotaDevice(BaseModel):
     lwt_current_value: Optional[Literal["Online", "Offline"]] = None
 
     def is_online(self, lwt_online_default_value: str = "Online") -> bool:
+        """Return whether the device is considered online.
+
+        The device is online if its ``lwt_current_value`` matches the configured
+        online LWT value from its configuration. If no custom LWT values are
+        available, the provided default value is used.
+
+        Args:
+            lwt_online_default_value: Default "online" string to compare against.
+
+        Returns:
+            bool: True if online, False otherwise.
+        """
         if self.tasmota_config and self.tasmota_config.online_msg:
             return self.lwt_current_value == self.tasmota_config.online_msg
 
