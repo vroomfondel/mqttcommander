@@ -1,3 +1,10 @@
+"""Utility script to update a GitHub Gist with repository clone statistics.
+
+Fetches the clone traffic via the GitHub API, merges it with existing history
+stored in a Gist, and updates a Shields.io-compatible badge JSON. Intended to
+run in CI. Google-style docstrings are used throughout.
+"""
+
 import os
 import json
 import sys
@@ -5,6 +12,12 @@ from pprint import pprint
 
 
 def install_and_import(packagename: str, pipname: str) -> None:
+    """Ensure a package is installed and import it into globals().
+
+    Args:
+        packagename: Import name used by ``import``.
+        pipname: Package name to install via pip if missing.
+    """
     import importlib
 
     try:
@@ -24,6 +37,14 @@ from github.Rate import Rate
 
 
 def main() -> None:
+    """Entry point to update the clones history and badge in a Gist.
+
+    Expects the following environment variables:
+      - ``GIST_TOKEN``: Personal access token with Gist scope
+      - ``GIST_ID``: ID of the target Gist
+      - ``REPO_TOKEN``: Token with repo read permission
+      - ``GITHUB_REPOSITORY``: Full repo name (e.g. ``user/repo``)
+    """
     print("update_badge.py::main()")
 
     # --- KONFIGURATION ---
@@ -98,6 +119,10 @@ def main() -> None:
 
 
 def get_usage_info() -> None:
+    """Print GitHub API rate limit information for debugging.
+
+    Requires ``PRIV_FULL_TOKEN`` or ``REPO_TOKEN`` in the environment.
+    """
     full_api_token: str = os.environ.get("PRIV_FULL_TOKEN", os.environ.get("REPO_TOKEN", ""))
 
     assert full_api_token is not None and len(full_api_token) > 0
