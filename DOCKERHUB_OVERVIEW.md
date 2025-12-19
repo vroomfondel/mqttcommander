@@ -105,6 +105,8 @@ Highlights:
   - `update_online_tasmotas(...)`
 - Command helpers to send one or many commands to all online devices:
   - `send_cmds_to_online_tasmotas(tasmotas, to_be_used_commands=[...], values_to_send=[...])`
+- Firmware management:
+  - `ensure_freshest_firmware(online_tasmotas, dry_run=False)`
 - Timezone utilities to ensure consistent device settings:
   - `ensure_correct_timezone_settings_for_tasmotas(online_tasmotas)`
 - JSON utilities and pretty-printers for review and persistence:
@@ -264,7 +266,7 @@ docker run --rm -it \
   -e LOGURU_LEVEL=DEBUG \  
   -v "$(pwd)/config.local.yaml:/app/config.local.yaml:ro" \  
   --entrypoint tini xomoxcc/mqttcommander:latest -- \
-  python main.py list-retained --grace-s 10
+  python main.py list-retained-msgs --grace-s 10
 ```
 
 
@@ -307,18 +309,33 @@ mqttcommander \
 # 2) Send a command to all online devices (e.g., toggle power)
 mqttcommander \
   --host broker --port 1883 --username user --password pass \
-  send-cmd --command Power --values Toggle
+  send-cmd --command Power --value Toggle
+
+# 3) List only online devices
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  list-online
+
+# 4) Upgrade online devices if newer firmware is available (via OtaURL)
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  upgrade-online --dry-run
+
+# 5) Trigger LWT Online for all currently offline devices (using Publish2)
+mqttcommander \
+  --host broker --port 1883 --username user --password pass \
+  trigger-lwt-send
 
 # Bonus) Show how many retained messages match default topics and print a few
 #        Optional: increase receive window and enable verbose output
 mqttcommander \
   --host broker --port 1883 --username user --password pass \
-  list-retained
+  list-retained-msgs
 
 # with options:
 mqttcommander \
   --host broker --port 1883 --username user --password pass \
-  list-retained --grace-s 10 --noisy
+  list-retained-msgs --grace-s 10 --noisy
 
 # Bonus) Load previously saved device list (if present) and show count
 #        Optional: specify custom snapshot directory and timezone
@@ -343,11 +360,11 @@ Two additional examples that build on the `MqttCommander` API:
 from mqttcommander import MqttCommander
 
 comm = MqttCommander(host="localhost", port=1883, username="user", password="pass")
-msgs = comm.get_all_retained(topics=["tasmota/discovery/#", "tele/+/STATE"], noisy=False, rettype="json")
+msgs = comm.get_all_retained_msgs(topics=["tasmota/discovery/#", "tele/+/STATE"], noisy=False, rettype="json")
 if msgs:
-    print(f"Collected {len(msgs)} retained messages")
-    for m in msgs[:5]:
-        print(m.topic)
+  print(f"Collected {len(msgs)} retained messages")
+  for m in msgs[:5]:
+    print(m.topic)
 
 # Example B: Ensure timezone settings are correct on all online devices
 from mqttcommander import MqttCommander
@@ -356,6 +373,9 @@ comm = MqttCommander(host="localhost", port=1883, username="user", password="pas
 all_devs = comm.get_all_tasmota_devices_from_retained(noisy=False)
 online = comm.filter_online_tasmotas_from_retained(all_devs)
 comm.ensure_correct_timezone_settings_for_tasmotas(online)
+
+# Example C: Upgrade firmware on all online devices (dry run)
+comm.ensure_freshest_firmware(online, dry_run=True)
 ```
 
 ## Testing

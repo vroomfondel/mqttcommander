@@ -23,7 +23,7 @@ from mqttstuff import MWMqttMessage, MosquittoClientWrapper, MQTTLastDataReader
 import pytz
 
 import Helper
-from mqttcommander.Helper import get_pretty_dict_json_no_sort
+from mqttcommander.Helper import get_pretty_dict_json_no_sort, compare_tasmota_versions
 from mqttcommander.models import (
     TasmotaTimezoneConfig,
     TasmotaDeviceConfig,
@@ -34,6 +34,8 @@ from mqttcommander.models import (
 )
 
 import loguru
+import requests
+import re
 from loguru import logger as glogger
 
 glogger.debug(f"{__name__} DEBUG")
@@ -87,6 +89,21 @@ class MqttCommander:
         username: str | None = None,
         password: str | None = None,
     ):
+        """Initialize the MqttCommander.
+
+        Args:
+            topics: Topic filters to subscribe to. Defaults to discovery and LWT topics.
+            msg_topicname_startwith_drop_filter: Set of topic prefixes to ignore.
+            mqttclient: Existing MQTT client wrapper. If not provided, connection
+                settings must be given.
+            host: MQTT host when creating a client.
+            port: MQTT port when creating a client.
+            username: MQTT username when creating a client.
+            password: MQTT password when creating a client.
+
+        Raises:
+            ValueError: If neither mqttclient nor full connection settings are provided.
+        """
         self.msg_topicname_startwith_drop_filter = msg_topicname_startwith_drop_filter
 
         if mqttclient is None and not all([host, port, username, password]):
@@ -139,7 +156,7 @@ class MqttCommander:
 
         return ret
 
-    def get_all_retained(
+    def get_all_retained_msgs(
         self,
         topics: list[str] | None = None,
         retained_msgs_receive_grace_ms: int = 2_000,
@@ -160,8 +177,7 @@ class MqttCommander:
             list[MWMqttMessage] | None: Retained messages or ``None`` if none received.
         """
 
-        logger = self.__class__.logger
-        logger = logger.bind(skiplog=not noisy)
+        logger = self.__class__.logger.bind(skiplog=not noisy)
 
         if topics is None:
             topics = self.topics
@@ -225,6 +241,7 @@ class MqttCommander:
         tasmotas: List[TasmotaDevice],
         to_be_used_commands: List[str] | None = None,
         values_to_send: List[List[str | float | dict | int] | None] | None = None,
+        noisy: bool = True
     ) -> List[TasmotaDevice]:
         """Send commands to all online Tasmota devices and collect responses.
 
@@ -232,11 +249,13 @@ class MqttCommander:
             tasmotas: Devices to target.
             to_be_used_commands: Command names in order; defaults to a standard set.
             values_to_send: Parallel list of values per device (or ``None`` to query status).
+            noisy: Enable high-level debug logging.
 
         Returns:
             list[TasmotaDevice]: The input list with updated fields populated from responses.
         """
-        logger = self.__class__.logger
+        logger = self.__class__.logger.bind(skiplog=not noisy)
+
         to_be_used_commands = to_be_used_commands or [
             "RULE1",
             "RULE2",
@@ -253,6 +272,7 @@ class MqttCommander:
             "TIMER2",
             "TIMER3",
             "TIMER4",
+            "OTAURL"
         ]
 
         values_to_send = values_to_send or [None for _ in tasmotas]
@@ -351,6 +371,12 @@ class MqttCommander:
                 resp_data: Dict[str, MWMqttMessage] = {}
 
                 def msg_received(msg: MWMqttMessage, userdata: Any) -> None:
+                    """Callback for when an MQTT message is received.
+
+                    Args:
+                        msg: The received MQTT message.
+                        userdata: Optional user data.
+                    """
                     logger.debug(f"MSG Received :: {msg=} {userdata=}")
 
                     with msg_received_cond:
@@ -366,7 +392,7 @@ class MqttCommander:
                 # td.tasmota_config.tp[1] ->stat
                 # td.tasmota_config.tp[1] ->tele
 
-                published_success: bool = mq.publish_one(topic=cmd_topic, value=to_send_value, timeout=5)
+                published_success: bool = mq.publish_one(topic=cmd_topic, value=to_send_value, timeout=5, rettype="str")
                 logger.debug(
                     f"{cmd_topic} [{td.tasmota_config.device_name}] -> published {to_send_value=} -> {published_success=}"
                 )
@@ -431,6 +457,8 @@ class MqttCommander:
                         td.tasmota_config.timer3 = msg_me.value["Timer3"]
                     case "TIMER4":
                         td.tasmota_config.timer4 = msg_me.value["Timer4"]
+                    case "OTAURL":
+                        td.tasmota_config.otaurl = msg_me.value["OtaUrl"]
 
                     # 17:04:45.530 CMD: setoption4 1
                     # 17:04:45.535 MQT: stat/tasmota_AB65AA/SETOPTION = {"SetOption4":"ON"}
@@ -462,6 +490,83 @@ class MqttCommander:
         mq.disconnect()
 
         return tasmotas
+
+    def ensure_freshest_firmware(self, online_tasmotas: List[TasmotaDevice], dry_run: bool = False) -> List[TasmotaDevice]:
+        """Check for firmware updates and trigger them if available.
+
+        Args:
+            online_tasmotas: Devices assumed to be online.
+            dry_run: If True, only log what would be done without triggering upgrades.
+
+        Returns:
+            list[TasmotaDevice]: Devices after potentially triggering upgrades.
+        """
+        logger = self.__class__.logger
+        online_tasmotas = self.send_cmds_to_online_tasmotas(online_tasmotas, ["OTAURL"], noisy=False)
+
+        # Group devices by OTA base URL to avoid redundant fetches
+        ota_groups: Dict[str, List[TasmotaDevice]] = {}
+        for td in online_tasmotas:
+            if not td.tasmota_config or not td.tasmota_config.otaurl:
+                continue
+
+            ota_url_str = str(td.tasmota_config.otaurl)
+            # Remove filename from URL to get index page
+            if "/" in ota_url_str:
+                base_url = ota_url_str.rsplit("/", 1)[0] + "/"
+            else:
+                base_url = ota_url_str
+
+            if base_url not in ota_groups:
+                ota_groups[base_url] = []
+            ota_groups[base_url].append(td)
+
+        for base_url, devices in ota_groups.items():
+            logger.info(f"Checking for updates at {base_url}")
+            try:
+                response = requests.get(base_url, timeout=10)
+                response.raise_for_status()
+                index_content = response.text
+
+                # Parse version from index page
+                # Expected format: "Release binaries for Tasmota firmware {MAJOR}.{MINOR}.{SUB} {RELEASENAME} on {DEVICE_TYPE}"
+                # We'll use a regex to find the version
+                version_match = re.search(r"Release binaries for Tasmota firmware (\d+\.\d+\.\d+)", index_content)
+                if not version_match:
+                    logger.warning(f"Could not find version info on index page {base_url}")
+                    continue
+
+                latest_version = version_match.group(1)
+                logger.info(f"Latest version at {base_url} is {latest_version}")
+
+                to_upgrade: List[TasmotaDevice] = []
+                for td in devices:
+                    assert td.tasmota_config is not None
+                    current_version = td.tasmota_config.software_version or "0.0.0"
+                    if compare_tasmota_versions(current_version, latest_version) < 0:
+                        logger.info(
+                            f"Upgrading {td.tasmota_config.device_name} from {current_version} to {latest_version}"
+                        )
+                        to_upgrade.append(td)
+                    else:
+                        logger.info(
+                            f"Device {td.tasmota_config.device_name} is up to date ({current_version})"
+                        )
+
+                if to_upgrade:
+                    # Trigger upgrade: Upgrade 1
+                    if dry_run:
+                        logger.info(f"Would upgrade {len(to_upgrade)} devices to latest firmware (dry_run==True)")
+                    else:
+                        self.send_cmds_to_online_tasmotas(
+                            to_upgrade, to_be_used_commands=["Upgrade"], values_to_send=[["1"] for _ in to_upgrade]
+                        )
+
+            except Exception as e:
+                logger.error(f"Failed to check/trigger upgrade for {base_url}: {e}")
+
+        return online_tasmotas
+
 
     def ensure_correct_timezone_settings_for_tasmotas(
         self, online_tasmotas: List[TasmotaDevice], timezoneconfig: Optional[TasmotaTimezoneConfig] = None
@@ -559,7 +664,12 @@ class MqttCommander:
     def read_tasmotas_from_file_update_save_to_file(
         self, tasmota_json_dir: Path | None = None, timezone: tzinfo = pytz.timezone("Europe/Berlin")
     ) -> None:
-        """Load last saved devices, update online ones, and persist back to file."""
+        """Read Tasmota devices from the latest snapshot, update their state, and save.
+
+        Args:
+            tasmota_json_dir: Directory containing Tasmota device snapshots.
+            timezone: Timezone for timestamp handling.
+        """
         logger = self.__class__.logger
 
         tds: List[TasmotaDevice] | None = read_tasmotas_from_latest_file(
@@ -607,12 +717,17 @@ class MqttCommander:
         write_tasmota_devices_file(tasmotas=tds)
 
     def get_all_tasmota_devices_from_retained(
-        self, topics: List[str] | None = None, noisy: bool = False, noisy_lowerlevel: bool = False
+        self,
+        topics: List[str] | None = None,
+        retained_msgs_receive_grace_ms: int = 2_000,
+        noisy: bool = False,
+        noisy_lowerlevel: bool = False,
     ) -> list[TasmotaDevice]:
         """Build a device list from retained discovery and LWT messages.
 
         Args:
             topics: Topic filters to use for discovery; defaults to `TASMOTA_DEFAULT_TOPICS`.
+            retained_msgs_receive_grace_ms: Time to wait for retained messages in milliseconds.
             noisy: Enable high-level debug logging.
             noisy_lowerlevel: Enable lower-level debug logging when reading retained.
 
@@ -625,9 +740,9 @@ class MqttCommander:
         topics = topics or TASMOTA_DEFAULT_TOPICS
         ret: list[TasmotaDevice] = []
 
-        msgs: list[MWMqttMessage] | None = self.get_all_retained(
+        msgs: list[MWMqttMessage] | None = self.get_all_retained_msgs(
             topics=topics,
-            retained_msgs_receive_grace_ms=2_000,
+            retained_msgs_receive_grace_ms=retained_msgs_receive_grace_ms,
             rettype="json",
             noisy=noisy_lowerlevel,
             fallback_rettype="str_raw",
@@ -803,8 +918,8 @@ def read_tasmotas_from_latest_file(
 
     Args:
         tasmota_json_dir: Directory containing JSON snapshots; defaults to package ``tasmotas`` dir or ``~/.tasmotacommander/tasmotas`` for installed modules.
-        noisy: If True, log discovered files with their timestamps.
         timezone: Timezone for pretty timestamp display.
+        noisy: If True, log discovered files with their timestamps.
 
     Returns:
         Optional[List[TasmotaDevice]]: Parsed devices or ``None`` if no file is found.

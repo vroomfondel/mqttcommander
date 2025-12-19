@@ -75,3 +75,41 @@ class ComplexEncoder(json.JSONEncoder):
             return robj
         else:
             return json.JSONEncoder.default(self, obj)
+
+
+def compare_tasmota_versions(v1: str, v2: str) -> int:
+    """Compare two Tasmota version strings.
+
+    Args:
+        v1: First version string (e.g., "13.2.0(tasmota)").
+        v2: Second version string.
+
+    Returns:
+        int: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2.
+    """
+    import re
+
+    def parse_version(v: str) -> list[int]:
+        """Extract the major.minor.patch part from a version string.
+
+        Args:
+            v: Version string.
+
+        Returns:
+            list[int]: [major, minor, patch] or [0, 0, 0] if no match.
+        """
+        # Extract the major.minor.patch part
+        match = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
+        if match:
+            return [int(x) for x in match.groups()]
+        return [0, 0, 0]
+
+    parts1 = parse_version(v1)
+    parts2 = parse_version(v2)
+
+    for p1, p2 in zip(parts1, parts2):
+        if p1 < p2:
+            return -1
+        if p1 > p2:
+            return 1
+    return 0

@@ -10,7 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Optional, Annotated, List, Literal, Any, Self
 
-from pydantic import BaseModel, Field, AliasPath, field_validator, AliasChoices
+from pydantic import BaseModel, Field, AliasPath, field_validator, AliasChoices, HttpUrl
 from pydantic.networks import IPv4Address
 from pydantic_extra_types.mac_address import MacAddress
 
@@ -201,7 +201,11 @@ class TasmotaDeviceConfig(BaseModel):
         teleperiod: Telemetry period in seconds.
         powerdelta1: Power delta threshold 1.
         setoption4: Serial log output option.
-        timer1..timer4: Optional timer configurations.
+        timer1: Timer 1 configuration.
+        timer2: Timer 2 configuration.
+        timer3: Timer 3 configuration.
+        timer4: Timer 4 configuration.
+        otaurl: Optional HttpUrl for firmware upgrades.
     """
 
     friendly_name: Optional[str] = Field(
@@ -229,6 +233,7 @@ class TasmotaDeviceConfig(BaseModel):
     timer2: Optional[TasmotaTimerConfig] = Field(None, validation_alias=AliasChoices("Timer2", "timer2"))
     timer3: Optional[TasmotaTimerConfig] = Field(None, validation_alias=AliasChoices("Timer2", "timer3"))
     timer4: Optional[TasmotaTimerConfig] = Field(None, validation_alias=AliasChoices("Timer4", "timer4"))
+    otaurl: Optional[HttpUrl] = Field(None, validation_alias=AliasChoices("otaurl", "ota_url"))
 
     # SSID1
     # SSID2
