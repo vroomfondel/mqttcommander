@@ -241,7 +241,7 @@ class MqttCommander:
         tasmotas: List[TasmotaDevice],
         to_be_used_commands: List[str] | None = None,
         values_to_send: List[List[str | float | dict | int] | None] | None = None,
-        noisy: bool = True
+        noisy: bool = True,
     ) -> List[TasmotaDevice]:
         """Send commands to all online Tasmota devices and collect responses.
 
@@ -272,7 +272,7 @@ class MqttCommander:
             "TIMER2",
             "TIMER3",
             "TIMER4",
-            "OTAURL"
+            "OTAURL",
         ]
 
         values_to_send = values_to_send or [None for _ in tasmotas]
@@ -491,7 +491,9 @@ class MqttCommander:
 
         return tasmotas
 
-    def ensure_freshest_firmware(self, online_tasmotas: List[TasmotaDevice], dry_run: bool = False) -> List[TasmotaDevice]:
+    def ensure_freshest_firmware(
+        self, online_tasmotas: List[TasmotaDevice], dry_run: bool = False
+    ) -> List[TasmotaDevice]:
         """Check for firmware updates and trigger them if available.
 
         Args:
@@ -549,9 +551,7 @@ class MqttCommander:
                         )
                         to_upgrade.append(td)
                     else:
-                        logger.info(
-                            f"Device {td.tasmota_config.device_name} is up to date ({current_version})"
-                        )
+                        logger.info(f"Device {td.tasmota_config.device_name} is up to date ({current_version})")
 
                 if to_upgrade:
                     # Trigger upgrade: Upgrade 1
@@ -566,7 +566,6 @@ class MqttCommander:
                 logger.error(f"Failed to check/trigger upgrade for {base_url}: {e}")
 
         return online_tasmotas
-
 
     def ensure_correct_timezone_settings_for_tasmotas(
         self, online_tasmotas: List[TasmotaDevice], timezoneconfig: Optional[TasmotaTimezoneConfig] = None

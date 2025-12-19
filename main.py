@@ -2,6 +2,7 @@
 
 Loads settings from config and invokes the CLI.
 """
+
 import sys
 
 from loguru import logger

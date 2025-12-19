@@ -3,6 +3,7 @@
 Provides a small set of subcommands to inspect retained messages, list
 discovered Tasmota devices, and send commands to online devices.
 """
+
 import textwrap
 from pathlib import Path
 from typing import Optional, List, cast, Union
@@ -15,7 +16,8 @@ from mqttcommander import (
     MqttCommander,
     TASMOTA_DEFAULT_TOPICS,
     read_tasmotas_from_latest_file,
-    TasmotaDevice, Helper,
+    TasmotaDevice,
+    Helper,
 )
 
 
@@ -96,7 +98,11 @@ def _run(
             noisy = False if not noisy else True
             noisy_lowerlevel = False if not noisy_lowerlevel else True
 
-            all_devs = comm.get_all_tasmota_devices_from_retained(noisy=noisy, noisy_lowerlevel=noisy_lowerlevel, retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s*1000)
+            all_devs = comm.get_all_tasmota_devices_from_retained(
+                noisy=noisy,
+                noisy_lowerlevel=noisy_lowerlevel,
+                retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000,
+            )
             logger.info(f"Found {len(all_devs)} tasmota devices from retained data")
             for d in all_devs:
                 tc = d.tasmota_config
@@ -110,7 +116,11 @@ def _run(
             retained_msgs_receive_grace_s = retained_msgs_receive_grace_s or 5
             noisy_lowerlevel = False if not noisy_lowerlevel else True
             noisy = False if not noisy else True
-            all_devs = comm.get_all_tasmota_devices_from_retained(noisy=noisy, noisy_lowerlevel=noisy_lowerlevel, retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s*1000)
+            all_devs = comm.get_all_tasmota_devices_from_retained(
+                noisy=noisy,
+                noisy_lowerlevel=noisy_lowerlevel,
+                retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000,
+            )
 
             online = comm.filter_online_tasmotas_from_retained(all_tasmotas=all_devs, update_lwt_current_value=True)
             logger.info(f"Online devices: {len(online)} / {len(all_devs)}")
@@ -128,15 +138,19 @@ def _run(
             noisy = False if not noisy else True
             noisy_lowerlevel = False if not noisy_lowerlevel else True
             retained_msgs_receive_grace_s = retained_msgs_receive_grace_s or 5
-            all_devs = comm.get_all_tasmota_devices_from_retained(noisy=noisy, noisy_lowerlevel=noisy_lowerlevel, retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s*1000)
+            all_devs = comm.get_all_tasmota_devices_from_retained(
+                noisy=noisy,
+                noisy_lowerlevel=noisy_lowerlevel,
+                retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000,
+            )
             online = comm.filter_online_tasmotas_from_retained(all_devs)
             # vals_typed = cast(
             #     List[List[Union[str, float, dict, int]] | None] | None, [values] if values is not None else None
             # )
-            val_typed = cast(
-                List[Union[str, float, dict, int]] | None, value if value is not None else None
+            val_typed = cast(List[Union[str, float, dict, int]] | None, value if value is not None else None)
+            comm.send_cmds_to_online_tasmotas(
+                online, to_be_used_commands=[command], values_to_send=[val_typed for _ in online]
             )
-            comm.send_cmds_to_online_tasmotas(online, to_be_used_commands=[command], values_to_send=[val_typed for _ in online])
         case "upgrade-online":
             dry_run = False if not dry_run else True
             noisy = False if not noisy else True
@@ -155,8 +169,11 @@ def _run(
             noisy = False if not noisy else True
             noisy_lowerlevel = False if not noisy_lowerlevel else True
             retained_msgs_receive_grace_s = retained_msgs_receive_grace_s or 5
-            all_devs = comm.get_all_tasmota_devices_from_retained(noisy=noisy, noisy_lowerlevel=noisy_lowerlevel,
-                                                                  retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000)
+            all_devs = comm.get_all_tasmota_devices_from_retained(
+                noisy=noisy,
+                noisy_lowerlevel=noisy_lowerlevel,
+                retained_msgs_receive_grace_ms=retained_msgs_receive_grace_s * 1000,
+            )
             offline = [d for d in all_devs if not d.is_online()]
             logger.info(f"Triggering LWT Online for {len(offline)} offline devices")
 
@@ -252,7 +269,6 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="Enable verbose output while receiving retained messages",
     )
 
-
     p_lo = sub.add_parser("list-online", help="Filter online devices and print them")
     p_lo.add_argument(
         "--grace-s",
@@ -278,7 +294,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     p_send.add_argument("--command", required=True, help="Command, e.g. Power")
     p_send.add_argument("--value", help="Value to send, e.g. Toggle or 1 0 ...")
 
-    p_lwt = sub.add_parser("trigger-lwt-send", help="Send command for all OFFLINE devices 'Publish2 tele/{topic}/LWT Online'")
+    p_lwt = sub.add_parser(
+        "trigger-lwt-send", help="Send command for all OFFLINE devices 'Publish2 tele/{topic}/LWT Online'"
+    )
     p_lwt.add_argument(
         "--grace-s",
         dest="retained_msgs_receive_grace_s",
@@ -299,12 +317,14 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="Enable verbose output while receiving retained messages",
     )
 
-    upg = sub.add_parser("upgrade-online", help="Upgrade online tasmotas from set OtaURL if there is a newer firmware available.")
+    upg = sub.add_parser(
+        "upgrade-online", help="Upgrade online tasmotas from set OtaURL if there is a newer firmware available."
+    )
     upg.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
-        help="Disable actual sending upgrade - enable \"dry run\"",
+        help='Disable actual sending upgrade - enable "dry run"',
     )
 
     args = parser.parse_args(argv)  # argv wird hier verwendet

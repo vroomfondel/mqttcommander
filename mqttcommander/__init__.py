@@ -3,6 +3,7 @@
 This package provides tools to manage Tasmota devices via MQTT, including
 discovery, configuration updates, and firmware management.
 """
+
 __version__ = "0.0.4"
 
 import os
