@@ -23,6 +23,7 @@ from mqttstuff import MWMqttMessage, MosquittoClientWrapper, MQTTLastDataReader
 import pytz
 
 import Helper
+from mqttcommander import __version__
 from mqttcommander.Helper import get_pretty_dict_json_no_sort, compare_tasmota_versions
 from mqttcommander.models import (
     TasmotaTimezoneConfig,
@@ -526,8 +527,16 @@ class MqttCommander:
         for base_url, devices in ota_groups.items():
             logger.info(f"Checking for updates at {base_url}")
             try:
-                response = requests.get(base_url, timeout=10)
-                response.raise_for_status()
+                try:
+                    response = requests.get(
+                        base_url,
+                        timeout=10,
+                        headers={"User-Agent": f"MQTTCommander/{__version__}"},
+                    )
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Could not fetch index page {base_url}: {e}")
+                    continue
                 index_content = response.text
 
                 # Parse version from index page
