@@ -388,7 +388,7 @@ pytest -q
 
 ## License
 
-This project is licensed under the LGPL where applicable/possible — see [LICENSE.md](LICENSE.md). Some files/parts may be governed by other licenses and/or licensors, such as [MIT](LICENSEMIT.md) | [GPL](LICENSEGPL.md) | [LGPL](LICENSELGPL.md). Please also check file headers/comments.
+This project is licensed under the LGPL where applicable/possible — see [LICENSE.md](https://github.com/vroomfondel/mqttcommander/blob/main/LICENSE.md). Some files/parts may be governed by other licenses and/or licensors, such as [MIT](https://github.com/vroomfondel/mqttcommander/blob/main/LICENSEMIT.md) | [GPL](https://github.com/vroomfondel/mqttcommander/blob/main/LICENSEGPL.md) | [LGPL](https://github.com/vroomfondel/mqttcommander/blob/main/LICENSELGPL.md). Please also check file headers/comments.
 
 ## Acknowledgments
 

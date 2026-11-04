@@ -56,19 +56,19 @@ classifiers = [
 
 
 dependencies = [
-    'mqttstuff>=0.0.4',
-    'pydantic>=2.11.0',
+    'mqttstuff>=0.0.7',
+    'pydantic>=2.14.2',
     'loguru>=0.7.3',
-    'pydantic-settings>=2.11.0',
-    'pydantic_extra_types>=2.10.2',
-    'PyYAML>=6.0.0',
-    'pytz>=2025.2'
+    'pydantic-settings>=2.16.2',
+    'pydantic_extra_types>=2.11.1',
+    'PyYAML>=6.0.3',
+    'pytz>=2026.6'
 
 #     dependecies from mqttstuff:
 #     'loguru>=0.7.3',
-#     'pytz>=2025.2',
+#     'pytz>=2026.6',
 #     'paho-mqtt>=2.1.0',
-#     'pydantic>=2.11.0',
+#     'pydantic>=2.14.2',
 ]
 
 [project.scripts]
