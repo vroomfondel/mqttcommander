@@ -3,17 +3,17 @@
 pyrefly
 pygithub
 
-pre-commit==4.5.*
+pre-commit>=4.7.0
 
 # linting
-isort==7.0.*
-black==25.12.*
-mypy==1.19.*
+isort>=9.0.2
+black>=26.10.1
+mypy>=2.4.1
 
-pytest==9.0.*
+pytest>=9.2.0
 
-types-pytz>=2025.2
+types-pytz>=2026.6.0.20261031
 
 # httpx
 # types-cachetools
-types-requests>=2.32.4.20250913
+types-requests>=2.33.0.20261030

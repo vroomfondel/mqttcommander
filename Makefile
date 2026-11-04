@@ -1,4 +1,4 @@
-.PHONY: tests help install venv lint dstart isort tcheck build commit-checks prepare pypibuild pypipush
+.PHONY: tests help install venv lint dstart isort tcheck build commit-checks prepare distcheck pypibuild pypipush update-all-dockerhub-readmes
 SHELL := /usr/bin/bash
 .ONESHELL:
 
@@ -13,6 +13,7 @@ help:
 	@printf "\ncommit-checks\n\trun pre-commit checks on all files\n"
 	@printf "\pypibuild \n\tbuild image package for pypi\n"
 	@printf "\pypipush \n\push package to pypi\n"
+	@printf "\nupdate-all-dockerhub-readmes \n\tupdate Docker Hub repo description from DOCKERHUB_OVERVIEW.md\n"
 	@printf "\nbuild \n\tbuild docker image\n"
 	@printf "\ndstart \n\tlaunch \"app\" in docker\n"
 
@@ -81,10 +82,18 @@ dist/mqttcommander-$(VERSION).tar.gz dist/mqttcommander-$(VERSION)-py3-none-any.
 	@touch dist/.touchfile
 
 
-pypibuild: venv dist/mqttcommander-$(VERSION).tar.gz dist/mqttcommander-$(VERSION)-py3-none-any.whl
+# Refuses to let a build artifact leave the machine if it carries a git-crypt
+# protected path (those are PLAINTEXT in the working tree) or any file outside
+# the allowlist that pyproject.toml declares. Gates `pypibuild` and `pypipush`.
+distcheck: venv dist/mqttcommander-$(VERSION).tar.gz dist/mqttcommander-$(VERSION)-py3-none-any.whl
+	@$(venv_activated)
+	python scripts/check_dist_secrets.py
+
+pypibuild: distcheck
 
 dist/.touchfile_push: dist/mqttcommander-$(VERSION).tar.gz dist/mqttcommander-$(VERSION)-py3-none-any.whl
 	@$(venv_activated)
+	$(MAKE) distcheck
 	hatch publish -r main
 	@touch dist/.touchfile_push
 
@@ -97,6 +106,30 @@ dstart:
 	# map config.local.yaml from current workdirectory into container
 	docker run --network=host -it --rm --name mqttcommanderephemeral -v $$(pwd)/config.local.yaml:/app/config.local.yaml xomoxcc/mqttcommander:latest /bin/bash
 
+update-all-dockerhub-readmes:
+	@AUTH=$$(jq -r '.auths["https://index.docker.io/v1/"].auth' ~/.docker/config.json | base64 -d) && \
+	USERNAME=$$(echo "$$AUTH" | cut -d: -f1) && \
+	PASSWORD=$$(echo "$$AUTH" | cut -d: -f2-) && \
+	TOKEN=$$(curl -s -X POST https://hub.docker.com/v2/users/login/ \
+	  -H "Content-Type: application/json" \
+	  -d '{"username":"'"$$USERNAME"'","password":"'"$$PASSWORD"'"}' \
+	  | jq -r .token) && \
+	for mapping in \
+	  ".:xomoxcc/mqttcommander"; do \
+	  DIR=$$(echo "$$mapping" | cut -d: -f1) && \
+	  REPO=$$(echo "$$mapping" | cut -d: -f2) && \
+	  FILE="$$DIR/DOCKERHUB_OVERVIEW.md" && \
+	  if [ -f "$$FILE" ]; then \
+	    echo "Updating $$REPO from $$FILE..." && \
+	    curl -s -X PATCH "https://hub.docker.com/v2/repositories/$$REPO/" \
+	      -H "Authorization: Bearer $$TOKEN" \
+	      -H "Content-Type: application/json" \
+	      -d "{\"full_description\": $$(jq -Rs . "$$FILE")}" \
+	      | jq -r '.full_description | length | "  Updated: \(.) chars"'; \
+	  else \
+	    echo "Skipping $$REPO - $$FILE not found"; \
+	  fi; \
+	done
 # From https://hatch.pypa.io/latest/publish/#authentication
 # HATCH_INDEX_USER and HATCH_INDEX_AUTH
 
