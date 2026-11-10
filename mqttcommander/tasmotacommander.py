@@ -22,7 +22,6 @@ from mqttstuff import MWMqttMessage, MosquittoClientWrapper, MQTTLastDataReader
 
 import pytz
 
-import Helper
 from mqttcommander import __version__
 from mqttcommander.Helper import get_pretty_dict_json_no_sort, compare_tasmota_versions
 from mqttcommander.models import (

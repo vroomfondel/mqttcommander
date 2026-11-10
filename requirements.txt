@@ -1,10 +1,10 @@
-mqttstuff>=0.0.7
+mqttstuff>=0.0.8
 loguru>=0.7.3
 pydantic-settings>=2.16.2
 pydantic_extra_types>=2.11.1
 PyYAML>=6.0.3
 pytz>=2026.6
-pydantic>=2.14.2
+pydantic>=2.14.3
 requests>=2.34.2
 
 
